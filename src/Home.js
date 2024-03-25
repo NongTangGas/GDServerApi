@@ -46,7 +46,7 @@ function Home() {
             {classData && classData.map((classItem, index) => (
               <div className="col mb-10" style={{ marginRight: '2rem' }} key={index}>
                 <div className="card" style={{ width: '15rem'}}>
-                  <img src={classItem.Thumbnail} className="card-img-top" style={{ padding:'30px',width: '100%', height: '100%'}} alt="..." />
+                  <img src={classItem.Thumbnail || "https://cdn-icons-png.flaticon.com/512/3643/3643327.png" } className="card-img-top" style={{ padding:'30px',width: '100%', height: '100%'}} alt="..." />
                   <div className="card-body">
                     <h5 className="card-title">{classItem.ClassID}</h5>
                     <div className="card-text">

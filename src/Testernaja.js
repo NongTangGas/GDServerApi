@@ -6,11 +6,10 @@ function Testernaja() {
   const [formData, setFormData] = useState({
     ClassName: '',
     ClassID: '',
-    Section: '',
-    SchoolYear: '',
-    file1: null,
-    file2: null
+    SchoolYear: ''
   });
+
+  const [responseMessage, setResponseMessage] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -19,26 +18,16 @@ function Testernaja() {
     });
   };
 
-  const handleFileChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.files[0]
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('data1:', formData);
     try {
-      const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await axios.post('http://127.0.0.1:5000/PostTester', formData);
+      console.log(response.data);
       console.log(response.data.message);
-      // Redirect or show success message as needed
+      console.log(response.data.Status);
     } catch (error) {
-      console.error('Error:', error.response.data.error);
-      // Handle error (e.g., show error message)
+      console.error('Error:', error.response.data.Status);
     }
   };
 
@@ -50,10 +39,9 @@ function Testernaja() {
         <input type="text" name="ClassName" placeholder="Class Name" onChange={handleChange} />
         <input type="text" name="ClassID" placeholder="Class ID" onChange={handleChange} />
         <input type="text" name="SchoolYear" placeholder="School Year" onChange={handleChange} />
-        CSV<input type="file" name="file1" onChange={handleFileChange} />
-        Thumbnail<input type="file" name="file2" onChange={handleFileChange} />
         <button type="submit">Submit</button>
       </form>
+      {responseMessage && <p>{responseMessage}</p>} {/* Display response message */}
     </div>
   );
 }

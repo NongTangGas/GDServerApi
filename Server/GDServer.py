@@ -4,6 +4,8 @@ import pymysql
 from werkzeug.utils import secure_filename
 import os
 import mysql.connector
+import csv
+
 
 app = Flask(__name__)
 CORS(app)
@@ -27,8 +29,185 @@ def teardown_request(exception=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+    
+UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile'
+
+""" Global API + Function """
+### Add a Student in grader
+def AddUserGrader(SID, Email, Name):
+    try:
+        # Connect to database
+        db = get_db()
+        cursor = db.cursor()
+
+        # Execute INSERT query
+        insert_user = "INSERT INTO user (EmailName, Email, Name) VALUES (%s, %s, %s)"
+        cursor.execute(insert_user, (SID, Email, Name))
+
+        # Commit the transaction
+        db.commit()
+
+        # Close cursor and database connection
+        cursor.close()
+        db.close()
+
+        # Return success response
+        return True
+    except Exception as e:
+        # Rollback the transaction in case of an error
+        db.rollback()
+        # Close cursor and database connection
+        cursor.close()
+        db.close()
+        # Return error response
+        return False
+    
+### Add a User in class
+def AddUserClass(UserEmail, ClassID, SchoolYear, Section):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Execute the SQL query to fetch the IDClass
+        query_getclass = """
+            SELECT DISTINCT ID
+            FROM Class
+            WHERE ClassID = %s AND Section = %s AND SchoolYear = %s
+        """
+        cursor.execute(query_getclass, (ClassID, Section, SchoolYear))
+        id_class = cursor.fetchone()
+
+        if id_class:
+            # Execute the SQL query to add the user to the class
+            query_insertUSC = """
+                INSERT INTO userclass (Email, IDClass)
+                VALUES (%s, %s)
+            """
+            cursor.execute(query_insertUSC, (UserEmail, id_class[0]))
+            conn.commit()
+            return True  # Return True if user added successfully
+        else:
+            return False  # Return False if class not found
+
+    except Exception as e:
+        return False  # Return False if an error occurred
+    finally:
+        cursor.close()
+        conn.close()
+        
+### Read CSV
+def ReadCSV(ClassID, SchoolYear):
+    SYFile = SchoolYear.replace("/", "T")
+    UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile/CSV'
+    filename = ClassID + "-" + SYFile + ".csv"
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+
+    try:
+        with open(file_path, newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            # Skip the header row if it exists
+            next(reader, None)
+            for row in reader:
+                # Assuming the CSV columns are SID, Name, and Section
+                SID, Name, Section = row
+                # Concatenate "@student.chula.ac.th" to the end of each SID to form an Email
+                Email = SID + "@student.chula.ac.th"
+                # Call your functions to add data to the database
+                AddUserGrader(SID, Email, Name)
+                AddUserClass(Email, ClassID, SchoolYear, Section)
+    except FileNotFoundError:
+        print(f"File {file_path} not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+ 
+### get classes by Email       
+@app.route('/class/classes', methods=['GET'])
+def get_classesdata():
+    try:
+        #Param
+        EmailR = request.args.get('Email')
+        
+        # Create a cursor
+        cur = g.db.cursor()
+
+        query = """
+            SELECT
+            	CLS.ID,
+            	CLS.Name,
+                CLS.ClassID,
+                CLS.Section,
+                CLS.SchoolYear,
+                CLS.Thumbnail
+            FROM
+            	class CLS
+                INNER JOIN userclass USC ON USC.IDClass = CLS.ID
+            WHERE
+                USC.EMAIL = %s
+            ORDER BY
+	            CLS.SchoolYear DESC;
+        """
+
+        # Execute a SELECT statement
+        cur.execute(query,(EmailR))
+        # Fetch all rows
+        data = cur.fetchall()
+
+        # Close the cursor
+        cur.close()
+
+        # Convert the result to the desired structure
+        transformed_data = []
+        for row in data:
+            id, name, class_id, section, school_year, thumbnail = row
+            transformed_data.append({
+                "ClassID": class_id,
+                "ClassName": name,
+                "ID": id,
+                "SchoolYear": school_year,
+                "Section": section,
+                "Thumbnail": thumbnail
+            })
+            
+        return jsonify(transformed_data)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'An error occurred'}), 500
+    
+
+    
+
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+    
+# Create the upload directory if it doesn't exist
+
+###Upload turnin assignment
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    uploaded_file = request.files["file"]
+
+    if uploaded_file.filename != "":
+        # Securely generate a unique filename
+        filename = secure_filename(uploaded_file.filename)
+        # Construct the full path to the file
+        filepath = os.path.join(UPLOAD_FOLDER,'TurnIn',filename)
+
+        try:
+            # Save the file
+            uploaded_file.save(filepath)
+            # Return a success message
+            return jsonify({"message": "File uploaded successfully!"})
+
+        except Exception as e:
+            # Handle any exceptions during file saving gracefully
+            print("Error saving file: {e}")
+            return jsonify({"error": "An error occurred while uploading the file."}), 500
 
 """ STUDENT API """
+### get all profile info by Email
 @app.route('/ST/user/profile', methods=['GET'])
 def get_userprofile():
     try:
@@ -74,7 +253,8 @@ def get_userprofile():
     except Exception as e:
         print(e)
         return jsonify({'error': 'An error occurred'}), 500
-    
+
+### get all assignment in class 
 @app.route('/ST/assignment/all', methods=['GET'])
 def get_all():
     try:
@@ -143,6 +323,7 @@ def get_all():
         print(e)
         return jsonify({'error': 'An error occurred'}), 500
 
+### get specific lab 
 @app.route('/ST/assignment/specific', methods=['GET'])
 def get_speclab():
     try:
@@ -244,98 +425,13 @@ def get_speclab():
         print(e)
         return jsonify({'error': 'An error occurred'}), 500
     
-""" Global API """
-@app.route('/class/classes', methods=['GET'])
-def get_classesdata():
-    try:
-        #Param
-        EmailR = request.args.get('Email')
-        
-        # Create a cursor
-        cur = g.db.cursor()
-
-        query = """
-            SELECT
-            	CLS.ID,
-            	CLS.Name,
-                CLS.ClassID,
-                CLS.Section,
-                CLS.SchoolYear,
-                CLS.Thumbnail
-            FROM
-            	class CLS
-                INNER JOIN userclass USC ON USC.IDClass = CLS.ID
-            WHERE
-                USC.EMAIL = %s
-            ORDER BY
-	            CLS.SchoolYear DESC;
-        """
-
-        # Execute a SELECT statement
-        cur.execute(query,(EmailR))
-        # Fetch all rows
-        data = cur.fetchall()
-
-        # Close the cursor
-        cur.close()
-
-        # Convert the result to the desired structure
-        transformed_data = []
-        for row in data:
-            id, name, class_id, section, school_year, thumbnail = row
-            transformed_data.append({
-                "ClassID": class_id,
-                "ClassName": name,
-                "ID": id,
-                "SchoolYear": school_year,
-                "Section": section,
-                "Thumbnail": thumbnail
-            })
-            
-        return jsonify(transformed_data)
-
-    except Exception as e:
-        print(e)
-        return jsonify({'error': 'An error occurred'}), 500
-    
-
-
-    
-UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile'
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    
-# Create the upload directory if it doesn't exist
-
-
-@app.route("/upload", methods=["POST"])
-def upload_file():
-    uploaded_file = request.files["file"]
-
-    if uploaded_file.filename != "":
-        # Securely generate a unique filename
-        filename = secure_filename(uploaded_file.filename)
-        # Construct the full path to the file
-        filepath = os.path.join(UPLOAD_FOLDER,'TurnIn',filename)
-
-        try:
-            # Save the file
-            uploaded_file.save(filepath)
-            # Return a success message
-            return jsonify({"message": "File uploaded successfully!"})
-
-        except Exception as e:
-            # Handle any exceptions during file saving gracefully
-            print("Error saving file: {e}")
-            return jsonify({"error": "An error occurred while uploading the file."}), 500
-
 """ TA API """
 #Save CSV(Create and Edit Class)
-def save_csv_file(ClassID, Section, SchoolYear, file):
+def save_csv_file(ClassID, SchoolYear, file):
     if file and file.filename != '':
         try:
-            filename = f"{ClassID}-{Section}-{SchoolYear}{os.path.splitext(file.filename)[1]}"
+            
+            filename = f"{ClassID}-{SchoolYear}{os.path.splitext(file.filename)[1]}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'CSV', filename)
             file.save(filepath)
             return True, os.path.join('File1', filename)  # Success flag and relative path
@@ -343,6 +439,7 @@ def save_csv_file(ClassID, Section, SchoolYear, file):
             print(f"Error saving CSV file: {e}")
             return False, None  # Return False if saving failed
     return True, None  # Return True if no file to save
+
 #Save Thumbnail(Create and Edit Class)
 def save_thumbnail_file(file):
     if file and file.filename != '':
@@ -356,13 +453,54 @@ def save_thumbnail_file(file):
             return False, None  # Return False if saving failed
     return True, None  # Return True if no file to save
 
+@app.route("/TA/class/create", methods=["POST"])
+def create_class():
+    DataJ = request.get_json()
+
+    ClassName = DataJ.get('ClassName')
+    ClassID = DataJ.get('ClassID')
+    SchoolYear = DataJ.get('SchoolYear')
+    Creator = DataJ.get('Creator')
+    Section = '0'
+    
+    # Prepare data for database insertion
+    CLS_data = (ClassName, ClassID, Section, SchoolYear)
+
+    
+    try:
+        # Establish MySQL connection
+        conn = get_db()
+        cursor = conn.cursor()
+            
+        # Insert data into the class table
+        insert_class_query = "INSERT INTO class (Name, ClassID, Section, SchoolYear) VALUES (%s, %s, %s, %s)"
+        cursor.execute(insert_class_query, CLS_data)
+        
+        # Commit the transaction
+        conn.commit()
+        
+        if AddUserClass(Creator, ClassID, SchoolYear, Section):
+            return jsonify({"Status": True})
+        else:
+            return jsonify({"Status": False})
+
+    except mysql.connector.Error as error:
+        # Rollback transaction in case of an error
+        conn.rollback()
+        return jsonify({"Status": False})
+
+    finally:
+        # Close the cursor and MySQL connection
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+            
+            
 #นักเรียนลด/ถอน => 1.ลบคะแนน SMT 2.ลบชั้นเรียน USC
 #result = delete_student_data(student_id)
 #if result:
 #    print("Data deleted successfully!")
 #else:
 #    print("Failed to delete data.")
-
 def delete_student_data(StudentID):
     conn = get_db()
     cursor = conn.cursor()
@@ -404,52 +542,10 @@ def delete_student_data(StudentID):
         # Close cursor and connection
         cursor.close()
         conn.close()
-
-
-@app.route("/TA/class/create", methods=["POST"])
-def create_class():
-    ClassName = request.form['ClassName']
-    ClassID = request.form['ClassID']
-    Section = '1'
-    SchoolYear = request.form['SchoolYear']
-    
-    # Handle CSV file
-    success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
-
-    # Handle Thumbnail file
-    success_thumbnail, PathToPicture2 = save_thumbnail_file(request.files.get('file2'))
-
-    if not (success_csv and success_thumbnail):
-        # Return success if no files to upload or both uploads failed
-        return jsonify({"message": "Data inserted successfully!"})
-
-    # Prepare data for database insertion
-    CLS_data = (ClassName, ClassID, Section, SchoolYear, PathToPicture1, PathToPicture2)
-
-    try:
-        # Establish MySQL connection
-        conn = get_db()
-        cursor = conn.cursor()
             
-        # Insert data into the class table
-        insert_class_query = "INSERT INTO class (Name, ClassID, Section, SchoolYear, PathToPicture1, PathToPicture2) VALUES (%s, %s, %s, %s, %s, %s)"
-        cursor.execute(insert_class_query, CLS_data)
-
-        # Commit the transaction
-        conn.commit()
-        
-        return jsonify({"message": f"Data inserted successfully!"})
-
-    except mysql.connector.Error as error:
-        # Rollback transaction in case of an error
-        conn.rollback()
-        return jsonify({"error": f"An error occurred while inserting data: {error}"}), 500
-
-    finally:
-        # Close the cursor and MySQL connection
-        if 'cursor' in locals() and cursor:
-            cursor.close()
             
+
+
 @app.route("/TA/class/edit", methods=["POST"])
 def edit_class():
     
@@ -554,6 +650,33 @@ def create_assignment():
         if 'cursor' in locals() and cursor:
             cursor.close()
 
+@app.route("/PostTester", methods=["POST"])
+def PostTester():
+    
+    # Get form data
+    data = request.get_json()
+    class_name = data.get('ClassName')
+    class_id = data.get('ClassID')
+    school_year = data.get('SchoolYear')
+    print('name:',class_name)
+    print('id:',class_id)
+    print('schoolyear:',school_year)
+    # Perform any processing with the form data
+    # For example, you can save it to a database or perform validations
+
+    # Construct a response
+    response = {
+        "message": "Data received successfully",
+        "Status": True,
+        "ClassName": class_name,
+        "ClassID": class_id,
+        "SchoolYear": school_year
+    }
+    return jsonify(response)
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
+
