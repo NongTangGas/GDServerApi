@@ -27,6 +27,12 @@ function Testernaja() {
     }
   };
   
+  const handleGetStudent = async (e) => {
+    e.preventDefault();
+    const response = await fetch(`http://127.0.0.1:5000/TA/Student/List?class_id=${PreData.ClassID}&school_year=${PreData.SchoolYear}`);
+    const data = await response.json();
+    console.log(data);
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,6 +85,7 @@ function Testernaja() {
         {message && <div className="alert alert-success mt-3" role="alert">{message}</div>}
         {error && <div className="alert alert-danger mt-3" role="alert">{error}</div>}
       </div>
+      <button className="btn btn-primary" onClick={handleGetStudent}>getStudentList</button>
     </div>
   );
 }
