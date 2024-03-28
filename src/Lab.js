@@ -7,6 +7,7 @@ function Lab() {
   const location = useLocation();
   const labData = location.state;
 
+  const Email = labData.Email;
   const classId = labData.classid;
   const speclab = labData.lab;
   const schoolYear = labData.schoolyear;
@@ -18,7 +19,7 @@ function Lab() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/specific?class_id=${classId}&speclab=${speclab}&school_year=${schoolYear}`);
+        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/specific?Email=${Email}&class_id=${classId}&speclab=${speclab}&school_year=${schoolYear}`);
         const data = await response.json();
         console.log(data);
         setAssignmentData(data);
@@ -57,7 +58,7 @@ function Lab() {
     formData.append('file', event.target.file.files[0]);
   
     try {
-      const response = await fetch('http://127.0.0.1:5000/upload', {
+      const response = await fetch('http://127.0.0.1:5000/upload/SMT', {
         method: 'POST',
         body: formData,
       });
@@ -103,7 +104,7 @@ function Lab() {
               </div>
             </div>
             <br />
-            <button className="btn btn-primary" style={{ marginLeft: '5em' }} onClick={() => navigate("/", { state: { classid: classId, schoolyear: schoolYear } })}>Back</button>
+            <button className="btn btn-primary" style={{ marginLeft: '5em' }} onClick={() => navigate("/", { state: { Email: Email,classid: classId, schoolyear: schoolYear } })}>Back</button>
           </div>
           <div className="col">
             {assignmentData?.Questions && Object.keys(assignmentData.Questions).map((questionKey, index) => {

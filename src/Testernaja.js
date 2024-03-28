@@ -3,45 +3,82 @@ import Navbarprof from './Navbarprof';
 import axios from 'axios';
 
 function Testernaja() {
-  const [formData, setFormData] = useState({
-    ClassName: '',
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [PreData, setFormData] = useState({
+    SchoolYear: '',
     ClassID: '',
-    SchoolYear: ''
+    file: null, // Initialize file as null
   });
 
-  const [responseMessage, setResponseMessage] = useState('');
-
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    console.log(e.target);
+    if (e.target.name === 'file') {
+      const file = e.target.files[0];
+      setFormData({
+        ...PreData,
+        file: file
+      });
+    } else {
+      setFormData({
+        ...PreData,
+        [e.target.name]: e.target.value
+      });
+    }
   };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('data1:', formData);
+    console.log(PreData)
+    const formData = new FormData();
+    formData.append('ClassID', PreData.ClassID);
+    formData.append('SchoolYear', PreData.SchoolYear);
+    formData.append('file', PreData.file);
+
+
     try {
-      const response = await axios.post('http://127.0.0.1:5000/PostTester', formData);
-      console.log(response.data);
-      console.log(response.data.message);
-      console.log(response.data.Status);
+      const response = await fetch('http://127.0.0.1:5000/upload/CSV', {
+        method: 'POST',
+        body: formData,
+      });
+      const responseData = await response.json();
+      console.log(responseData);
+      // Update the submission response state for the specific question
+      console.log('response:',responseData)
+      console.log('Data submitted successfully!');
+      /* setMessage(response.data.message);
+      setError(''); */
     } catch (error) {
-      console.error('Error:', error.response.data.Status);
+      console.error('Error submitting data:', error);
+      /* setMessage('');
+      setError(error.response.data.error); */
     }
   };
 
   return (
     <div>
       <Navbarprof />
-      <br />
-      <form onSubmit={handleSubmit}>
-        <input type="text" name="ClassName" placeholder="Class Name" onChange={handleChange} />
-        <input type="text" name="ClassID" placeholder="Class ID" onChange={handleChange} />
-        <input type="text" name="SchoolYear" placeholder="School Year" onChange={handleChange} />
-        <button type="submit">Submit</button>
-      </form>
-      {responseMessage && <p>{responseMessage}</p>} {/* Display response message */}
+      <div className="container">
+        <h2>Upload CSV File</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label htmlFor="classID" className="form-label">Class ID:</label>
+            <input type="text" className="form-control" id="ClassID" name="ClassID" onChange={handleChange} required />
+          </div>
+          <div className="mb-3">
+            <label htmlFor="schoolYear" className="form-label">School Year:</label>
+            <input type="text" className="form-control" id="SchoolYear" name="SchoolYear" onChange={handleChange} required />
+          </div>
+          <div className="mb-3">
+            <label htmlFor="file" className="form-label">Choose CSV File:</label>
+            <input type="file" className="form-control" id="file" name="file" onChange={handleChange} required />
+          </div>
+          <button type="submit" className="btn btn-primary">Upload</button>
+        </form>
+        {message && <div className="alert alert-success mt-3" role="alert">{message}</div>}
+        {error && <div className="alert alert-danger mt-3" role="alert">{error}</div>}
+      </div>
     </div>
   );
 }

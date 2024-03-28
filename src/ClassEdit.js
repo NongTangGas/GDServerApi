@@ -1,9 +1,31 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react';
 import Navbarprof from './Navbarprof'
 import { Link } from 'react-router-dom'
+import { useLocation } from 'react-router-dom';
 
 function ClassEdit() {
-  return (
+
+    const location = useLocation();
+    const classData = location.state;
+    const classId = classData.classid;
+    const schoolYear = classData.schoolyear;
+    const Email = classData.User;
+    console.log(classId,schoolYear,Email)
+
+    const [formDataEdit, setFormDataEdit] = useState({
+        Creator: '',
+        ClassName: '',
+        ClassID: '',
+        SchoolYear: ''
+      });
+
+    const [formDataDelete, setFormDataDelete] = useState({
+        ClassName: '',
+        ClassID: '',
+        SchoolYear: ''
+      });
+
+    return (
     <div>
         <Navbarprof></Navbarprof> 
       <br></br>

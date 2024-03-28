@@ -10,26 +10,44 @@ function App() {
   const navigate = useNavigate();
 
   const [assignmentData, setAssignmentData] = useState(null);
-
+  const [userData, setUserData] = useState(null);
   const location = useLocation();
   const classData = location.state;
+  const Email = classData.Email;
   const classId = classData.classid;
   const schoolYear = classData.schoolyear;
 
+
   useEffect(() => {
     console.log('getHome:',classData);
-    const fetchData = async () => {
+
+    const fetchUserData = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/all?class_id=${classId}&school_year=${schoolYear}`);
+        const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
+        const userdata = await response.json();
+        console.log('user:', userdata);
+        setUserData(userdata);
+        console.log(userdata.ID);
+        // Call fetchData here after setting userData
+        fetchData(userdata.ID);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+  
+    const fetchData = async (userId) => {
+      try {
+        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/all?SID=${userId}&class_id=${classId}&school_year=${schoolYear}`);
         const data = await response.json();
         console.log(data);
         setAssignmentData(data);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
     };
-
-    fetchData();
+  
+    fetchUserData();
+  
   }, []);
   
   //Check TurnIn Late
@@ -96,7 +114,7 @@ function App() {
             <div className="card-header">
               <ul className="nav nav-tabs card-header-tabs">
                 <li className="nav-item">
-                  <a className="nav-link active" href="#">Assignments</a>
+                  <a className="nav-link active">Assignments</a>
                 </li>
                 <li className="nav-item">
                 <Link to="/Portfolio">
@@ -113,7 +131,7 @@ function App() {
                  return (
                    <div key={lab} className="card-body">
                      <ol className="list-group">
-                       <button onClick={() => navigate("/Lab", { state:{lab:lab.slice(-1),classid:classId,schoolyear:schoolYear} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+                       <button onClick={() => navigate("/Lab", { state:{ Email: Email,lab:lab.slice(-1),classid:classId,schoolyear:schoolYear} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
                          <div className="ms-2 me-auto">
                            <div className="fw-bold">
                              {lab}: {labInfo.Name}

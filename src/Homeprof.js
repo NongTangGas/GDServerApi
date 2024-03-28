@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbarprof from './Navbarprof'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -69,7 +69,7 @@ function Homeprof() {
 
   const handleCancel = () => {
     setFormData({
-      Creator: userData.Email,
+      Creator:'',
       ClassName: '',
       ClassID: '',
       SchoolYear: ''
@@ -86,13 +86,14 @@ function Homeprof() {
     console.log('Form Data:', formData);
     try {
       const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData);
-      if (response.data.Status) {
+      response.then (()=> {
+      if (response.data.Status) { 
         console.log("True"); // Log "True" if response.data is true
         setShowAlert(true);
       } else {
         console.log("False"); // Log "False" if response.data is false
       }
-      
+    })
     } catch (error) {
       console.error('Error');
     }
@@ -166,8 +167,9 @@ function Homeprof() {
                     <button onClick={() => navigate("/AssignList", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })} className="btn btn-primary">View course</button>
                   </div>
                   <div class="card-footer">
-                  <Link onClick={() => navigate("/ClassEdit", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })}>Edit</Link>
+                  <div style={{textDecoration: 'underline',color: 'blue',cursor: 'pointer',}} onClick={() => navigate("/ClassEdit", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear, User:  userData.Email} })}>Edit</div>
                   </div>
+                  <Link onClick={() => console.log(formData)}>Edit</Link>
                 </div>
               </div>
             ))}

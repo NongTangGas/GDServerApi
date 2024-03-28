@@ -54,7 +54,7 @@ function Home() {
                       <p style={{ display: 'inline-block', marginRight: '10px' }}>{classItem.SchoolYear}</p>
                       <p style={{ display: 'inline-block' }}>Sec{classItem.Section}</p>
                     </div>
-                    <button onClick={() => navigate("/", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })} className="btn btn-primary">View course</button>
+                    <button onClick={() => navigate("/", { state: { Email: Email,classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })} className="btn btn-primary">View course</button>
                   </div>
                 </div>
               </div>
