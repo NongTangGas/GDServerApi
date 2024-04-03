@@ -15,7 +15,6 @@ function App() {
   const classData = location.state;
   const Email = classData.Email;
   const classId = classData.classid;
-  const schoolYear = classData.schoolyear;
 
 
   useEffect(() => {
@@ -37,7 +36,8 @@ function App() {
   
     const fetchData = async (userId) => {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/all?SID=${userId}&class_id=${classId}&school_year=${schoolYear}`);
+        console.log(classId)
+        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/all?SID=${userId}&CID=${classId}`);
         const data = await response.json();
         console.log(data);
         setAssignmentData(data);
@@ -131,7 +131,7 @@ function App() {
                  return (
                    <div key={lab} className="card-body">
                      <ol className="list-group">
-                       <button onClick={() => navigate("/Lab", { state:{ Email: Email,lab:lab.slice(-1),classid:classId,schoolyear:schoolYear} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+                       <button onClick={() => navigate("/Lab", { state:{ Email: Email,lab:lab.slice(-1),classid:classId} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
                          <div className="ms-2 me-auto">
                            <div className="fw-bold">
                              {lab}: {labInfo.Name}

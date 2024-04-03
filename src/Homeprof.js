@@ -29,30 +29,30 @@ function Homeprof() {
     SchoolYear: ''
   });
 
-  
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
+      const data = await response.json();
+      console.log('user:', data);
+      setUserData(data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const fetchClassData = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/class/classes?Email=${Email}`);
+      const data = await response.json();
+      console.log('class:', data);
+      setClassData(data);
+    } catch (error) {
+      console.error('Error fetching class data:', error);
+    }
+  };
 
   useEffect(() => {
-    const fetchClassData = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/class/classes?Email=${Email}`);
-        const data = await response.json();
-        console.log('class:', data);
-        setClassData(data);
-      } catch (error) {
-        console.error('Error fetching class data:', error);
-      }
-    };
-  
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
-        const data = await response.json();
-        console.log('user:', data);
-        setUserData(data);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    };
+    
     fetchUserData();
     fetchClassData();
   }, []);
@@ -86,14 +86,12 @@ function Homeprof() {
     console.log('Form Data:', formData);
     try {
       const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData);
-      response.then (()=> {
-      if (response.data.Status) { 
-        console.log("True"); // Log "True" if response.data is true
+      console.log(response)
+      if (response.data.Status) {
+        fetchClassData();
         setShowAlert(true);
       } else {
-        console.log("False"); // Log "False" if response.data is false
       }
-    })
     } catch (error) {
       console.error('Error');
     }

@@ -11,30 +11,29 @@ function Home() {
   const Email = '6331234567@student.chula.ac.th';
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
-        const data = await response.json();
-        console.log('user:', data);
-        setUserData(data);
+        // Fetch user data
+        const userResponse = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
+        const userData = await userResponse.json();
+        console.log('user:', userData);
+        setUserData(userData);
+  
+        // Fetch class data if user data is available
+        if (userData) {
+          const classResponse = await fetch(`http://127.0.0.1:5000/class/classes?UID=${userData.ID}`);
+          const classData = await classResponse.json();
+          console.log('class:', classData);
+          setClassData(classData);
+        }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching data:', error);
       }
     };
-
-    const fetchClassData = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/class/classes?Email=${Email}`);
-        const data = await response.json();
-        console.log('class:', data);
-        setClassData(data);
-      } catch (error) {
-        console.error('Error fetching class data:', error);
-      }
-    };
-    fetchUserData();
-    fetchClassData();
+  
+    fetchData();
   }, []);
+  
 
   return (
     <main>
@@ -54,7 +53,7 @@ function Home() {
                       <p style={{ display: 'inline-block', marginRight: '10px' }}>{classItem.SchoolYear}</p>
                       <p style={{ display: 'inline-block' }}>Sec{classItem.Section}</p>
                     </div>
-                    <button onClick={() => navigate("/", { state: { Email: Email,classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })} className="btn btn-primary">View course</button>
+                    <button onClick={() => navigate("/", { state: { Email: Email,classid: classItem.ID} })} className="btn btn-primary">View course</button>
                   </div>
                 </div>
               </div>
