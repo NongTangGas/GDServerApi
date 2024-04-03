@@ -16,7 +16,7 @@ def get_db():
             host='127.0.0.1',
             user='root',
             password='Taotong',
-            database='grader',
+            database='grader2',
         )
     return g.db
 
@@ -41,30 +41,19 @@ def isCSV(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv'
 
 ### Add a Student in grader
-def AddUserGrader(SID, Email, Name):
+def AddUserGrader(dbAUG, cursor, SID, Email, Name):
     try:
-        dbAUG = get_db()
-        cursor = dbAUG.cursor()
         insert_user = "INSERT INTO user (EmailName, Email, Name) VALUES (%s, %s, %s)"
         cursor.execute(insert_user, (SID, Email, Name))
         dbAUG.commit()
-        cursor.close()
-        dbAUG.close()
         return True
     except Exception as e:
         dbAUG.rollback()
-        cursor.close()
-        dbAUG.close()
         return False
     
 ### Add a User in class
-def AddUserClass(UserEmail, ClassID, SchoolYear, Section):
-    print(UserEmail, ClassID, SchoolYear, Section)
+def AddUserClass(dbAUC, cursor, UserEmail, ClassID, SchoolYear, Section):
     try:
-        print("please help me am stuck")
-        dbAUC = get_db()
-        cursor = dbAUC.cursor()
-        
         query_getclass = """
             SELECT DISTINCT ID
             FROM Class
@@ -73,15 +62,12 @@ def AddUserClass(UserEmail, ClassID, SchoolYear, Section):
         cursor.execute(query_getclass, (ClassID, Section, SchoolYear))
         id_class = cursor.fetchone()
         
-        print(id_class)
-        
         if id_class:
             query_insertUSC = """
                 INSERT INTO userclass (Email, IDClass) VALUES (%s, %s)
             """
             cursor.execute(query_insertUSC, (UserEmail, id_class[0]))
-            dbAUC.commit()
-            
+            dbAUC.commit()    
             return True
         else:
             dbAUC.rollback()
@@ -89,19 +75,12 @@ def AddUserClass(UserEmail, ClassID, SchoolYear, Section):
 
 
     except Exception as e:
-        print("in error")
-        print("An error occurred:", e)
         dbAUC.rollback()
-    finally:
-        if cursor and not cursor.closed:
-            cursor.close()
-        if dbAUC and dbAUC.open:
-            dbAUC.close()
+        print("An error occurred:", e)
         
-def DeleteUserClass(Email,class_id,school_year):
+###Delete user in Class
+def DeleteUserClass(conn,cursor,Email,class_id,school_year):
     try:
-        conn = get_db()
-        cursor = conn.cursor()
         delete_query = """
             DELETE SMT
             FROM submitted SMT
@@ -112,12 +91,19 @@ def DeleteUserClass(Email,class_id,school_year):
         """
         cursor.execute(delete_query, (Email, class_id, school_year))
         conn.commit()
-        cursor.close()
-        conn.close()
         return jsonify({"message": "Rows deleted successfully"}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500  
+
+### Delete User Summit
+def DeleteUserSummit(conn,cursor):
+    try:
+        conn = get_db()
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500  
+        
 
 ###Upload turnin assignment
 @app.route("/upload/CSV", methods=["POST"])
@@ -158,6 +144,8 @@ def UpdateStudentCSV(ClassID, SchoolYear):
     
     file_path = os.path.join(UPLOAD_FOLDER,'CSV',filename)
     try:
+        dbAUG = get_db()
+        cursor = dbAUG.cursor()    
         with open(file_path, newline='') as csvfile:
             reader = csv.reader(csvfile)
             # Skip the header row if it exists
@@ -166,43 +154,70 @@ def UpdateStudentCSV(ClassID, SchoolYear):
                 print(row)
                 SID, Name, Section = row
                 Email = SID + "@student.chula.ac.th"
-                AddUserGrader(SID, Email, Name)
-                AddUserClass(Email, ClassID, SchoolYear, Section)
+                AddUserGrader(dbAUG, cursor, SID, Email, Name)
+                AddUserClass(dbAUG, cursor, Email, ClassID, SchoolYear, Section)
     except FileNotFoundError:
         print(f"File {file_path} not found.")
     except Exception as e:
         print("An error occurred:", e)
-
  
 ### get classes by Email       
 @app.route('/class/classes', methods=['GET'])
 def get_classesdata():
     try:
         #Param
-        EmailR = request.args.get('Email')
+        UID = request.args.get('UID')
         
         # Create a cursor
         cur = g.db.cursor()
 
         query = """
             SELECT
-            	CLS.ID,
-            	CLS.Name,
+                SCT.CID,
+                CLS.ClassName,
                 CLS.ClassID,
-                CLS.Section,
+                SCT.Section,
                 CLS.SchoolYear,
-                CLS.Thumbnail
+                CLS.Thumbnail,
+                CLS.ClassCreator,
+                1 as ClassRole,
+                CLS.CSYID
             FROM
-            	class CLS
-                INNER JOIN userclass USC ON USC.IDClass = CLS.ID
+                class CLS
+                INNER JOIN section SCT ON SCT.CSYID = CLS.CSYID
+                INNER JOIN student STD ON STD.CID = SCT.CID
+                INNER JOIN user USR ON USR.UID = STD.UID
+                LEFT JOIN classeditor CET ON CET.CSYID = CLS.CSYID AND CET.Email = USR.Email
+            WHERE 
+                USR.UID = %s
+                AND Section <> 0
+            UNION
+            SELECT DISTINCT
+                SCT.CID,
+                CLS.ClassName,
+                CLS.ClassID,
+                SCT.Section,
+                CLS.SchoolYear,
+                CLS.Thumbnail,
+                CLS.ClassCreator,
+                2 as ClassRole,
+                CLS.CSYID
+            FROM
+                User USR
+                INNER JOIN classeditor CET
+                LEFT JOIN class CLS ON CET.CSYID = CLS.CSYID 
+                INNER JOIN section SCT ON SCT.CSYID = CLS.CSYID
+                LEFT JOIN student STD ON STD.CID = SCT.CID 
             WHERE
-                USC.EMAIL = %s
+                USR.UID = %s
+                AND USR.Email IN (CET.Email)
+                AND Section <> 0
             ORDER BY
-	            CLS.SchoolYear DESC;
+                SchoolYear DESC,ClassName ASC;
         """
 
         # Execute a SELECT statement
-        cur.execute(query,(EmailR))
+        cur.execute(query,(UID,UID))
         # Fetch all rows
         data = cur.fetchall()
 
@@ -212,11 +227,11 @@ def get_classesdata():
         # Convert the result to the desired structure
         transformed_data = []
         for row in data:
-            id, name, class_id, section, school_year, thumbnail = row
+            cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
             transformed_data.append({
                 "ClassID": class_id,
                 "ClassName": name,
-                "ID": id,
+                "ID": csyid,
                 "SchoolYear": school_year,
                 "Section": section,
                 "Thumbnail": thumbnail
@@ -228,13 +243,6 @@ def get_classesdata():
         print(e)
         return jsonify({'error': 'An error occurred'}), 500
     
-
-
-
-
-
-    
-# Create the upload directory if it doesn't exist
 
 
 ###Upload turnin assignment
@@ -272,14 +280,14 @@ def get_userprofile():
 
         query = """
             SELECT
-            	USR.EmailName,
+                USR.UID,
                 USR.Email,
                 USR.Name,
                 USR.Role
             FROM
-            	user USR
-            WHERE
-            	USR.Email = %s
+                user USR
+            WHERE 
+                Email= %s
         """
 
         # Execute a SELECT statement
@@ -314,38 +322,35 @@ def get_all():
         
         #Param
         student_id = request.args.get('SID')
-        class_id = request.args.get('class_id')
-        school_year = request.args.get('school_year')
+        class_id = request.args.get('CID')
         
         # Create a cursor
         cur = g.db.cursor()
 
         query = """
             SELECT
-            	QST.LAB,
+                QST.Lab,
                 QST.Question,
                 LB.Name,
-                ASN.DueTime,
-                SMT.TimeStamp,
-                CASE WHEN SMT.TimeStamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
-            	CASE WHEN ASN.DueTime <= SMT.TimeStamp THEN TRUE ELSE FALSE END AS Late
+                ASN.Due,
+                SMT.Timestamp,
+                QST.MaxScore,
+                SMT.Score,
+                CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
+                CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
             FROM
-            	question QST
-                INNER JOIN assign ASN ON QST.LAB = ASN.LAB
-                INNER JOIN submitted SMT ON QST.LAB = SMT.LAB AND QST.Question = SMT.Question
-                RIGHT JOIN lab LB ON QST.LAB = LB.LAB 
+                question QST
+                INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab
+                INNER JOIN section SCT ON SCT.CSYID = QST.CSYID
+                INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab
+                INNER JOIN student STD ON STD.UID = %s AND STD.CID = ASN.CID
+                LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
             WHERE
-                SMT.StudentID = %s
-            	AND QST.ClassID = %s
-                AND QST.SchoolYear = %s
-                AND QST.ClassID = ASN.ClassID AND ASN.ClassID = SMT.ClassID AND SMT.SchoolYear = LB.SchoolYear
-                AND QST.SchoolYear = ASN.SchoolYear AND ASN.SchoolYear = SMT.SchoolYear AND SMT.SchoolYear = LB.SchoolYear
-            ORDER BY
-            	QST.LAB ASC, QST.Question ASC;
+                QST.CSYID = %s
                  """
 
         # Execute a SELECT statement
-        cur.execute(query, (student_id,class_id, school_year))
+        cur.execute(query, (student_id,class_id))
         # Fetch all rows
         data = cur.fetchall()
 
@@ -355,7 +360,7 @@ def get_all():
         # Convert the result to the desired structure
         transformed_data = {}
         for row in data:
-            lab, question, name, due_time, timestamp, turn_in, late = row
+            lab, question, name, due_time, timestamp, Maxscore, score, turn_in, late = row
             lab = 'Lab'+str(lab)
             question = 'Q'+str(question)
         
@@ -521,8 +526,6 @@ def create_class():
     ClassID = DataJ.get('ClassID')
     SchoolYear = DataJ.get('SchoolYear')
     Creator = DataJ.get('Creator')
-    
-    print(ClassName,ClassID,SchoolYear,Creator)
     Section = '0'
     
     # Prepare data for database insertion
@@ -541,21 +544,38 @@ def create_class():
         # Commit the transaction
         conn.commit()
         
-        if AddUserClass(Creator, ClassID, SchoolYear, Section):
-            return jsonify({"message": "File uploaded successfully!"})
+        if AddUserClass(conn,cursor,Creator, ClassID, SchoolYear, Section):
+            return jsonify({"Status": True})
         else:
             return jsonify({"Status": False})
-
     except mysql.connector.Error as error:
-        # Rollback transaction in case of an error
         conn.rollback()
         return jsonify({"Status": False})
-
-    finally:
-        # Close the cursor and MySQL connection
-        if 'cursor' in locals() and cursor:
-            cursor.close()
             
+@app.route("/TA/class/delete", methods=["POST"])
+def delete_class():
+    DataJ = request.get_json()
+    
+    ClassName = DataJ.get('ClassName')
+    ClassID = DataJ.get('ClassID')
+    SchoolYear = DataJ.get('SchoolYear')
+    CLS_data = (ClassName, ClassID, SchoolYear)
+
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+            
+        insert_class_query = "INSERT INTO class (Name, ClassID, Section, SchoolYear) VALUES (%s, %s, %s, %s)"
+        cursor.execute(insert_class_query, CLS_data)
+        
+        # Commit the transaction
+        conn.commit()
+        
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"Status": False})            
+
             
 #นักเรียนลด/ถอน => 1.ลบคะแนน SMT 2.ลบชั้นเรียน USC
 #result = delete_student_data(student_id)
@@ -609,47 +629,6 @@ def create_class():
 
 @app.route("/TA/class/edit", methods=["POST"])
 def edit_class():
-    
-    ClassID = request.form.get('ClassID')
-    if not ClassID:
-        return jsonify({"error": "ClassID is required."}), 400
-    
-    ClassName = request.form.get('ClassName')
-    Section = request.form.get('Section')
-    SchoolYear = request.form.get('SchoolYear')
-    
-    # Handle CSV file
-    success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
-
-    # Handle Thumbnail file
-    success_thumbnail, PathToPicture2 = save_thumbnail_file(request.files.get('file2'))
-
-    if not (success_csv and success_thumbnail):
-        return jsonify({"error": "Failed to save one or more files."}), 500
-
-    try:
-        # Establish MySQL connection
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        update_query = "UPDATE class SET Name = %s, Section = %s, SchoolYear = %s, PathToPicture1 = %s, PathToPicture2 = %s WHERE ClassID = %s"
-        cursor.execute(update_query, (ClassName, Section, SchoolYear, PathToPicture1, PathToPicture2, ClassID))
-
-        conn.commit()
-        
-        return jsonify({"message": "Class updated successfully!"})
-
-    except mysql.connector.Error as error:
-        conn.rollback()
-        return jsonify({"error": f"An error occurred while updating class: {error}"}), 500
-
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-            
-            
-@app.route("/TA/class/delete", methods=["POST"])
-def delete_class():
     
     ClassID = request.form.get('ClassID')
     if not ClassID:
@@ -767,6 +746,7 @@ def LabStudentList():
             	QST.LAB,
                 QST.Question,
                 USR.EmailName,
+                CLS.Section,
                 USR.Name,
                 SMT.TimeStamp,
                 SMT.Score,
@@ -799,7 +779,7 @@ def LabStudentList():
         transformed_data = {}
 
         for row in data:
-            lab, question, emailname, name, timestamp, score, maxscore, duetime, turn_in, late = row
+            lab, question, emailname, section, name, timestamp, score, maxscore, duetime, turn_in, late = row
 
             # Convert turn_in and late to boolean values
             turn_in_bool = bool(turn_in)
@@ -807,7 +787,7 @@ def LabStudentList():
 
             # Create LAB if it doesn't exist
             if emailname not in transformed_data:
-                transformed_data[emailname] = {"EmailName": emailname, "Name": name}
+                transformed_data[emailname] = {"EmailName": emailname, "Name": name, "Section":section}
 
             # Create LAB dictionary if it doesn't exist
             if f'LAB{lab}' not in transformed_data[emailname]:
