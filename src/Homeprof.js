@@ -8,11 +8,16 @@ function Homeprof() {
   const navigate = useNavigate();
 
   const [userData, setUserData] = useState(null);
-  const [classData, setClassData] = useState(null);
+  const [courses, setCourses] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [ready, setReady] = useState(null);
 
   const Email = '9876543210@student.chula.ac.th';
+
+  const [expandedYear, setExpandedYear] = useState(null);
+
+  
 
 
   const handleChange = (e) => {
@@ -35,28 +40,40 @@ function Homeprof() {
       const data = await response.json();
       console.log('user:', data);
       setUserData(data);
-      fetchClassData(data.ID);
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
 
-  const fetchClassData = async (UID) => {
+  const fetchCourses = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/ST/class/classes?UID=${UID}`);
+      const response = await fetch(`http://127.0.0.1:5000/TA/class/classes?Email=${Email}`);
       const data = await response.json();
       console.log('class:', data);
-      setClassData(data);
+      const sortedCourses = Object.fromEntries(Object.entries(data).sort((a, b) => b[0].localeCompare(a[0])));
+  
+      setCourses(sortedCourses);
     } catch (error) {
       console.error('Error fetching class data:', error);
     }
   };
+  
 
   useEffect(() => {
-    
     fetchUserData();
+    fetchCourses();
+    setReady(true);
   }, []);
+  
 
+  const toggleYear = (year) => {
+    if (expandedYear === year) {
+      setExpandedYear(null);
+    } else {
+      setExpandedYear(year);
+    }
+  };
+  
   const handleToggleExpand = () => {
     setExpanded(!expanded);
     setFormData({
@@ -88,7 +105,7 @@ function Homeprof() {
       const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData);
       console.log(response)
       if (response.data.Status) {
-        fetchClassData();
+        fetchCourses();
         setShowAlert(true);
       } else {
       }
@@ -109,72 +126,79 @@ function Homeprof() {
       <br />
       <div className="d-flex align-items-center">
         <h5 className="me-2">Course</h5>
-        <button onClick={() => navigate("/ClassCreate", { state: { Email: Email } })} className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
-        {!expanded ? (
-          <button onClick={handleToggleExpand} className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
-        ) : (
-          <div className="card" style={{ marginLeft: '10em', marginRight: '10em', width: '640px' }}>
-            <div className="card-header">
-              <h4>Create Class</h4>
-            </div>
-            <div className="card-body">
-              <form className="row g-3">
-                <div className="col-md-3">
-                  <label htmlFor="inputID" className="form-label">Class ID</label>
-                  <input type="text" name="ClassID" className="form-control" id="inputID" onChange={handleChange} />
-                </div>
-                <div className="col-md-3">
-                  <label htmlFor="inputYear" className="form-label">School Year</label>
-                  <input type="text" name="SchoolYear" className="form-control" id="inputYear" onChange={handleChange} />
-                </div>
-                <div className="col-6">
-                  <label htmlFor="inputName" className="form-label">Class Name</label>
-                  <input type="text" name="ClassName" className="form-control" id="inputClass" onChange={handleChange} />
-                </div>
-                <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-                  <button type="button" className="btn btn-danger" onClick={handleCancel}>Cancel</button>
-                  <div>
-                    <button type="button" className="btn btn-primary" onClick={handleCreateClick}>Create</button>
-                    <br />
+        {!expanded ? (<button  onClick={handleToggleExpand} className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>) : null }
+      </div>
+      {!expanded ? (null) : ( 
+          <div className="container d-flex justify-content-center">
+            <div className="card" style={{ width: '640px' }}>
+              <div className="card-header">
+                <h4>Create Class</h4>
+              </div>
+              <div className="card-body">
+                <form className="row g-3">
+                  <div className="col-md-3">
+                    <label htmlFor="inputID" className="form-label">Class ID</label>
+                    <input type="text" name="ClassID" className="form-control" id="inputID" onChange={handleChange} />
                   </div>
-                </div>
-              </form>
+                  <div className="col-md-3">
+                    <label htmlFor="inputYear" className="form-label">School Year</label>
+                    <input type="text" name="SchoolYear" className="form-control" id="inputYear" onChange={handleChange} />
+                  </div>
+                  <div className="col-6">
+                    <label htmlFor="inputName" className="form-label">Class Name</label>
+                    <input type="text" name="ClassName" className="form-control" id="inputClass" onChange={handleChange} />
+                  </div>
+                  <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="button" className="btn btn-danger" onClick={handleCancel}>Cancel</button>
+                    <div>
+                      <button type="button" className="btn btn-primary" onClick={handleCreateClick}>Create</button>
+                      <br />
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-        )}
-      </div>
-        
-        
+          )}
 
+
+      {courses && ready ? (
         <main>
-      <div>
-        <br />
-        <div className="container-lg mb-3 bg-light" style={{ padding: '10px' }}>
-          <div className="row row-cols-md-5 g-4">
-            {classData && classData.map((classItem, index) => (
-              <div className="col mb-10" style={{ marginRight: '2rem' }} key={index}>
-                <div className="card" style={{ width: '15rem'}}>
-                  <img src={classItem.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'30px',width: '100%', height: '100%'}} alt="..." />
-                  <div className="card-body">
-                    <h5 className="card-title">{classItem.ClassID}</h5>
-                    <div className="card-text">
-                      <p style={{ display: 'inline-block', marginRight: '10px' }}className="card-text">{classItem.ClassName}</p>
-                      <p style={{ display: 'inline-block', marginRight: '10px' }}>{classItem.SchoolYear}</p>
-                      <p style={{ display: 'inline-block' }}>Sec{classItem.Section}</p>
-                    </div>
-                    <button onClick={() => navigate("/AssignList", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear } })} className="btn btn-primary">View course</button>
+          <div>
+            <br></br>
+            {/* วนลูปเพื่อแสดง container แยกตามปีการศึกษา */}
+            {Object.entries(courses).map(([year, classes]) => (
+              <div key={year} className="container-lg mb-3 bg-light" style={{ padding: '10px' }}>
+                <h5 onClick={() => toggleYear(year)} style={{ cursor: 'pointer' }}>
+                  {year} {expandedYear === year ? " (- Click to collapse)" : " (+ Click to expand)"}
+                </h5>
+                {expandedYear === year && (
+                  <div className="row row-cols-1 row-cols-md-5 g-2">
+                    {/* วนลูปเพื่อแสดงข้อมูลคอร์สในแต่ละปีการศึกษา */}
+                    {classes.map(course => (
+                      <div key={course.ID} className="col">
+                        <div className="card h-100" style={{width: '15rem'}}><div>
+                          <img src={course.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
+                          </div>
+                          <div className="card-body" style={{ overflowY: 'scroll' }}>
+                            <h5 className="card-title">{course.ClassName}</h5>
+                            <p className="card-text">{course.ClassID}</p>
+                            <button onClick={() => navigate("/AssignList", { state: { Email: Email,classid: course.ID} })} className="btn btn-primary">View course</button>
+                          </div>
+                          <div className="card-footer">
+                            <Link onClick={() => navigate("/ClassEdit", { state: { Email: Email,classid: course.ID} })} className="lini text-muted">Edit</Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div class="card-footer">
-                  <div style={{textDecoration: 'underline',color: 'blue',cursor: 'pointer',}} onClick={() => navigate("/ClassEdit", { state: { classid: classItem.ClassID, schoolyear: classItem.SchoolYear, User:  userData.Email} })}>Edit</div>
-                  </div>
-                  <Link onClick={() => console.log(formData)}>Edit</Link>
-                </div>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      </div>
-    </main>
+        </main>
+      ) : (
+        "")}
 
     </div>
   )

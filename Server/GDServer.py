@@ -220,33 +220,12 @@ def get_classesdata():
             WHERE 
                 USR.UID = %s
                 AND Section <> 0
-            UNION
-            SELECT DISTINCT
-                SCT.CID,
-                CLS.ClassName,
-                CLS.ClassID,
-                SCT.Section,
-                CLS.SchoolYear,
-                CLS.Thumbnail,
-                CLS.ClassCreator,
-                2 as ClassRole,
-                CLS.CSYID
-            FROM
-                User USR
-                INNER JOIN classeditor CET
-                LEFT JOIN class CLS ON CET.CSYID = CLS.CSYID 
-                INNER JOIN section SCT ON SCT.CSYID = CLS.CSYID
-                LEFT JOIN student STD ON STD.CID = SCT.CID 
-            WHERE
-                USR.UID = %s
-                AND USR.Email IN (CET.Email)
-                AND Section <> 0
             ORDER BY
                 SchoolYear DESC,ClassName ASC;
         """
 
         # Execute a SELECT statement
-        cur.execute(query,(UID,UID))
+        cur.execute(query,(UID))
         # Fetch all rows
         data = cur.fetchall()
 
@@ -254,7 +233,7 @@ def get_classesdata():
         cur.close()
 
         ### sort by schoolyear
-        """ transformed_data = {}
+        transformed_data = {}
         for row in data:
             cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
             class_info = {
@@ -269,9 +248,9 @@ def get_classesdata():
             else:
                 transformed_data[school_year].append(class_info)
 
-        return jsonify(transformed_data) """
+        return jsonify(transformed_data)
 
-        transformed_data = []
+        """ transformed_data = []
         for row in data:
             cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
             transformed_data.append({
@@ -281,7 +260,7 @@ def get_classesdata():
                 "SchoolYear": school_year,
                 "Section": section,
                 "Thumbnail": thumbnail
-            })
+            }) """
             
         return jsonify(transformed_data)
 
@@ -340,7 +319,7 @@ def Editor_Class():
                 transformed_data[schoolyear] = [class_info]
             else:
                 transformed_data[schoolyear].append(class_info)
-
+    
         return jsonify(transformed_data)
 
     except Exception as e:

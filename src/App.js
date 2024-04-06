@@ -124,7 +124,7 @@ function App() {
               </ul>
             </div>
     
-             {assignmentData ? (
+             {assignmentData && Object.keys(assignmentData.Assignment).length > 0 ? (
              <div>
                {Object.keys(assignmentData.Assignment).map((lab) => {
                  const labInfo = assignmentData.Assignment[lab];
@@ -146,17 +146,33 @@ function App() {
                })}
              </div>
            ) : (
-             <div className="card-body">
-               <ol className="list-group">
-                 <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{padding:'1rem'}}>
-                   <div className="ms-2 me-auto">
-                     <div className="fw-bold" style={{fontSize:'larger'}}>
-                       Loading...
-                     </div>
-                   </div>
-                 </button>
-               </ol>
-             </div>
+            assignmentData && Object.keys(assignmentData.Assignment).length == 0 ? (
+              <div className="card-body">
+                <ol className="list-group">
+                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{padding:'1rem'}}>
+                    <div className="ms-2 me-auto">
+                      <div className="fw-bold" style={{fontSize:'larger'}}>
+                        There is no assignment
+                      </div>
+                    </div>
+                  </button>
+                </ol>
+              </div>
+            ) : 
+            (
+              <div className="card-body">
+                <ol className="list-group">
+                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{padding:'1rem'}}>
+                    <div className="ms-2 me-auto">
+                      <div className="fw-bold" style={{fontSize:'larger'}}>
+                        Loading...
+                      </div>
+                    </div>
+                  </button>
+                </ol>
+              </div>
+            )
+            
             )}
         </div>
      
