@@ -5,10 +5,12 @@ from werkzeug.utils import secure_filename
 import os
 import mysql.connector
 import csv
-
+from datetime import datetime
+import pytz
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
+
 
 def get_db():
     if 'db' not in g:
@@ -29,7 +31,9 @@ def teardown_request(exception=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
-    
+
+gmt_timezone = pytz.timezone('GMT')
+
 ########UPLOAD_FOLDER
 UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -40,6 +44,31 @@ if not os.path.exists(UPLOAD_FOLDER):
 def isCSV(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv'
 
+def isIPYNB(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
+
+#### Add CET
+def AddClassEditor(dbACE,cursor,Email,CSYID):
+    try:
+        insert_user = "INSERT INTO classeditor (Email, CSYID) VALUES (%s, %s)"
+        cursor.execute(insert_user, (Email, CSYID))
+        dbACE.commit()
+        return True
+    except Exception as e:
+        dbACE.rollback()
+        return False
+
+def GetCSYID(dbCLS,cursor,ClassID,SchoolYear):
+    try:
+        query = """SELECT CSYID FROM class CLS WHERE CLS.ClassID = %s AND CLS.SchoolYear = %s"""
+        cursor.execute(query,(ClassID,SchoolYear))
+        # Fetch all rows
+        dbCLS = cursor.fetchone()
+        return dbCLS[0]
+    except Exception as e:
+        dbCLS.rollback()
+        return False
+        
 ### Add a Student in grader
 def AddUserGrader(dbAUG, cursor, SID, Email, Name):
     try:
@@ -105,7 +134,7 @@ def DeleteUserSummit(conn,cursor):
         return jsonify({"error": str(e)}), 500  
         
 
-###Upload turnin assignment
+###Upload CSV
 @app.route("/upload/CSV", methods=["POST"])
 def upload_CSV():
     
@@ -162,7 +191,7 @@ def UpdateStudentCSV(ClassID, SchoolYear):
         print("An error occurred:", e)
  
 ### get classes by Email       
-@app.route('/class/classes', methods=['GET'])
+@app.route('/ST/class/classes', methods=['GET'])
 def get_classesdata():
     try:
         #Param
@@ -224,6 +253,142 @@ def get_classesdata():
         # Close the cursor
         cur.close()
 
+        ### sort by schoolyear
+        """ transformed_data = {}
+        for row in data:
+            cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
+            class_info = {
+                "ClassID": class_id,
+                "ClassName": name,
+                "ID": csyid,
+                "Section": section,
+                "Thumbnail": thumbnail
+            }
+            if school_year not in transformed_data:
+                transformed_data[school_year] = [class_info]
+            else:
+                transformed_data[school_year].append(class_info)
+
+        return jsonify(transformed_data) """
+
+        transformed_data = []
+        for row in data:
+            cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
+            transformed_data.append({
+                "ClassID": class_id,
+                "ClassName": name,
+                "ID": csyid,
+                "SchoolYear": school_year,
+                "Section": section,
+                "Thumbnail": thumbnail
+            })
+            
+        return jsonify(transformed_data)
+
+        
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'An error occurred'}), 500
+    
+@app.route('/TA/class/classes', methods=['GET'])
+def Editor_Class():
+    try:
+        
+        #Param
+        Email = request.args.get('Email')
+        
+        # Create a cursor
+        cur = g.db.cursor()
+
+        query = """
+            SELECT
+                CLS.CSYID,
+                CLS.ClassName,
+                CLS.ClassID,
+                CLS.SchoolYear,
+                CLS.Thumbnail
+            FROM
+                class CLS
+                INNER JOIN classeditor CET ON CET.CSYID = CLS.CSYID 
+            WHERE 
+                CET.Email = %s
+            ORDER BY
+                SchoolYear DESC;
+                 """
+
+        # Execute a SELECT statement
+        cur.execute(query, (Email))
+        # Fetch all rows
+        data = cur.fetchall()
+
+        # Close the cursor
+        cur.close()
+
+        # Convert the result to the desired structure
+        transformed_data = {}
+
+        for row in data:
+            csyid, classname, classid, schoolyear, thumbnail = row
+            class_info = {
+                'ID': csyid,
+                'ClassName': classname,
+                'ClassID': classid,
+                'Thumbnail': thumbnail if thumbnail else None
+            }
+            if schoolyear not in transformed_data:
+                transformed_data[schoolyear] = [class_info]
+            else:
+                transformed_data[schoolyear].append(class_info)
+
+        return jsonify(transformed_data)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'An error occurred'}), 500
+
+@app.route('/TA/class/classes/section', methods=['GET'])
+def ASLCP():
+    try:
+        #Param
+        UID = request.args.get('UID')
+        
+        # Create a cursor
+        cur = g.db.cursor()
+
+        query = """
+            SELECT DISTINCT
+                SCT.CID,
+                CLS.ClassName,
+                CLS.ClassID,
+                SCT.Section,
+                CLS.SchoolYear,
+                CLS.Thumbnail,
+                CLS.ClassCreator,
+                2 as ClassRole,
+                CLS.CSYID
+            FROM
+                User USR
+                INNER JOIN classeditor CET
+                LEFT JOIN class CLS ON CET.CSYID = CLS.CSYID 
+                INNER JOIN section SCT ON SCT.CSYID = CLS.CSYID
+                LEFT JOIN student STD ON STD.CID = SCT.CID 
+            WHERE
+                USR.UID = %s
+                AND USR.Email IN (CET.Email)
+                AND Section <> 0
+            ORDER BY
+                SchoolYear DESC,ClassName ASC;
+        """
+
+        # Execute a SELECT statement
+        cur.execute(query,(UID))
+        # Fetch all rows
+        data = cur.fetchall()
+
+        # Close the cursor
+        cur.close()
+
         # Convert the result to the desired structure
         transformed_data = []
         for row in data:
@@ -242,30 +407,53 @@ def get_classesdata():
     except Exception as e:
         print(e)
         return jsonify({'error': 'An error occurred'}), 500
-    
-
 
 ###Upload turnin assignment
 @app.route("/upload/SMT", methods=["POST"])
-def upload_file():
+def TurnIn():
+    
+    UID = request.form.get("UID")
+    CSYID = request.form.get("CSYID")
+    Lab = request.form.get("Lab")
+    Question = request.form.get("Question")    
     uploaded_file = request.files["file"]
 
+    upload_time = datetime.now(gmt_timezone)
+    
+    if not isIPYNB(uploaded_file.filename):
+        return jsonify({"message": "upload file must be .ipynb"}), 500 
     if uploaded_file.filename != "":
-        # Securely generate a unique filename
-        filename = secure_filename(uploaded_file.filename)
-        # Construct the full path to the file
+        filename = secure_filename(uploaded_file.filename)        
+        filename = f"{UID}-L{Lab}Q{Question}-{CSYID}{os.path.splitext(uploaded_file.filename)[1]}"
         filepath = os.path.join(UPLOAD_FOLDER,'TurnIn',filename)
 
         try:
-            # Save the file
             uploaded_file.save(filepath)
-            # Return a success message
-            return jsonify({"message": "File uploaded successfully!"})
+            ###test score
+            score=10
+            
+            try:
+                conn = get_db()
+                cursor = conn.cursor()
+
+                Insert_TurnIn = """ INSERT INTO submitted (UID, Lab, Question, TurnInFile, score, Timestamp, CSYID)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) AS new
+                    ON DUPLICATE KEY UPDATE TurnInFile = new.TurnInFile,Timestamp = new.Timestamp,score = new.score; """
+                cursor.execute(Insert_TurnIn,(UID,Lab,Question,uploaded_file.filename,score,upload_time,CSYID))
+                conn.commit()
+                
+            except Exception as e:
+                conn.rollback()
+                print("Error update score: {e}")
+                return jsonify({"message": "An error occurred while updating score."}), 500
+            
+            return jsonify({"message": "File uploaded successfully!","At":upload_time.strftime("%Y-%m-%d %H:%M:%S"),"FileName":uploaded_file.filename,"Score":score})
 
         except Exception as e:
             # Handle any exceptions during file saving gracefully
             print("Error saving file: {e}")
-            return jsonify({"error": "An error occurred while uploading the file."}), 500
+            return jsonify({"message": "An error occurred while uploading the file."}), 500
+        
 
 """ STUDENT API """
 ### get all profile info by Email
@@ -389,64 +577,54 @@ def get_speclab():
     try:
         
         #Param
-        Email = request.args.get('Email')
-        class_id = request.args.get('class_id')
-        speclab = request.args.get('speclab')
-        school_year = request.args.get('school_year')
-        
-        student_id = Email.split('@')[0]
-        
+        Uid = request.args.get('UID')
+        Csyid = request.args.get('CSYID')
+        Lab = request.args.get('speclab')
+
         # Create a cursor
         cur = g.db.cursor()
 
         query = """
-            SELECT DISTINCT
-            	QST.LAB,
-            	LB.Name,
-            	QST.ID,
-            	QST.Question,
-            	ASN.DueTime,
-            	SMT.TimeStamp,
-            	SMT.Score,
-            	QST.MaxScore,
-            	SMT.PathToFile AS TurnInFile,
-            	ADF.PathToFile AS QuestionFile
+            SELECT
+                QST.Lab,
+                LB.Name,
+                QST.QID,
+                QST.Question,
+                ASN.Due,
+                SMT.Timestamp,
+                SMT.Score,
+                QST.MaxScore,
+                SMT.TurnInFile
             FROM
-            	question QST
-            	INNER JOIN assign ASN
-            	INNER JOIN submitted SMT ON QST.Question = SMT.Question
-            	INNER JOIN addfile ADF
-            	INNER JOIN lab LB
+                question QST
+                INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab
+                INNER JOIN section SCT ON SCT.CSYID = QST.CSYID
+                INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab
+                INNER JOIN student STD ON STD.UID = %s AND STD.CID = ASN.CID
+                LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
             WHERE
-            	SMT.StudentID = %s
-            	AND QST.ClassID = %s
-                AND QST.LAB = %s
-                AND QST.SchoolYear = %s
-                AND QST.LAB = ASN.LAB AND ASN.LAB = SMT.LAB  AND LB.LAB = ADF.LAB  AND SMT.LAB = LB.LAB
-            	AND QST.ClassID = ASN.ClassID AND ASN.ClassID = SMT.ClassID AND SMT.ClassID = LB.ClassID AND LB.ClassID = ADF.ClassID
-            	AND QST.SchoolYear = ASN.SchoolYear AND ASN.SchoolYear = SMT.SchoolYear AND SMT.SchoolYear = LB.SchoolYear AND LB.SchoolYear = ADF.SchoolYear
-            ORDER BY
-            	QST.LAB ASC, QST.Question ASC;
+                QST.CSYID = %s
+                AND QST.Lab = %s
                     """
 
         # Execute a SELECT statement
-        cur.execute(query,(student_id,class_id,speclab,school_year))
+        cur.execute(query,(Uid,Csyid,Lab))
         # Fetch all rows
         data = cur.fetchall()
 
         # Close the cursor
-        cur.close()
+        
 
         # Convert the result to the desired structure
         transformed_data_list = []
         
         for row in data:
-            lab, lab_name, question_id, question, due_time, submission_time, score, max_score, turn_in_file, question_file = row
+            lab, lab_name, question_id, question, due_time, submission_time, score, max_score, turn_in_file = row
             lab_num = 'Lab' + str(lab)
-        
+
             # Construct the question key
             question_key = 'Q' + str(question)
-        
+
             # Check if lab_num already exists in transformed_data_list
             lab_exists = False
             for item in transformed_data_list:
@@ -454,18 +632,18 @@ def get_speclab():
                     lab_exists = True
                     lab_data = item
                     break
-                
+
             # If lab_num doesn't exist, create it
             if not lab_exists:
                 lab_data = {
                     'Lab': lab_num,
                     'Name': lab_name,
                     'Due': due_time,
-                    'Files':[],
+                    'Files': [],
                     'Questions': {}
                 }
                 transformed_data_list.append(lab_data)
-        
+
             # Initialize the question key if it doesn't exist
             if question_key not in lab_data['Questions']:
                 lab_data['Questions'][question_key] = {
@@ -474,17 +652,30 @@ def get_speclab():
                     'Submission': {
                         'Date': submission_time,
                         'FileName': turn_in_file,
-                        },
+                    },
                     'Score': score,
                     'MaxScore': max_score
                 }
-        
-            if question_file not in lab_data['Files']:
-                lab_data['Files'].append(question_file)
-        
+
+            # Fetch files for the current lab and add them to the lab's 'Files' list
+            query_files = """
+                SELECT
+                    PathToFile
+                FROM
+                    addfile ADF
+                WHERE
+                    ADF.CSYID = %s
+                    AND ADF.Lab = %s
+            """
+            cur.execute(query_files, (Csyid, lab))
+            files_data = cur.fetchall()
+            for file_row in files_data:
+                file_path = file_row[0]
+                if file_path not in lab_data['Files']:
+                    lab_data['Files'].append(file_path)
+
         # jsonify the transformed data list
         return jsonify(transformed_data_list[0])
-
 
     except Exception as e:
         print(e)
@@ -529,7 +720,7 @@ def create_class():
     Section = '0'
     
     # Prepare data for database insertion
-    CLS_data = (ClassName, ClassID, Section, SchoolYear)
+    CLS_data = (ClassName, ClassID, SchoolYear, Creator)
 
     
     try:
@@ -538,13 +729,11 @@ def create_class():
         cursor = conn.cursor()
             
         # Insert data into the class table
-        insert_class_query = "INSERT INTO class (Name, ClassID, Section, SchoolYear) VALUES (%s, %s, %s, %s)"
+        insert_class_query = "INSERT INTO class (ClassName, ClassID, SchoolYear, ClassCreator) VALUES (%s, %s, %s, %s)"
         cursor.execute(insert_class_query, CLS_data)
-        
-        # Commit the transaction
         conn.commit()
         
-        if AddUserClass(conn,cursor,Creator, ClassID, SchoolYear, Section):
+        if AddClassEditor(conn,cursor,Creator,GetCSYID(conn,cursor,ClassID,SchoolYear)):
             return jsonify({"Status": True})
         else:
             return jsonify({"Status": False})
@@ -554,11 +743,12 @@ def create_class():
             
 @app.route("/TA/class/delete", methods=["POST"])
 def delete_class():
-    DataJ = request.get_json()
     
-    ClassName = DataJ.get('ClassName')
-    ClassID = DataJ.get('ClassID')
-    SchoolYear = DataJ.get('SchoolYear')
+    CSYID = request.args.get('CSYID')
+    ClassName = request.args.get('ClassName')
+    ClassID = request.args.get('ClassID')
+    SchoolYear = request.args.get('SchoolYear')
+    
     CLS_data = (ClassName, ClassID, SchoolYear)
 
     
@@ -566,66 +756,15 @@ def delete_class():
         conn = get_db()
         cursor = conn.cursor()
             
-        insert_class_query = "INSERT INTO class (Name, ClassID, Section, SchoolYear) VALUES (%s, %s, %s, %s)"
-        cursor.execute(insert_class_query, CLS_data)
+        insert_class_query = "DELETE FROM class WHERE CSYID = %s;"
+        cursor.execute(insert_class_query, (CSYID))
         
         # Commit the transaction
         conn.commit()
-        
+        return jsonify({"Status": True}) 
     except mysql.connector.Error as error:
         conn.rollback()
-        return jsonify({"Status": False})            
-
-            
-#นักเรียนลด/ถอน => 1.ลบคะแนน SMT 2.ลบชั้นเรียน USC
-#result = delete_student_data(student_id)
-#if result:
-#    print("Data deleted successfully!")
-#else:
-#    print("Failed to delete data.")
-########################################
-# def delete_student_data(StudentID):
-#    conn = get_db()
-#    cursor = conn.cursor()
-#    
-#    try:
-#        # Begin transaction
-#        conn.start_transaction()
-#        
-#        # SQL query to delete data from submitted table
-#        delete_query_1 = """
-#            DELETE SMT
-#            FROM submitted SMT
-#            INNER JOIN userclass USC ON SMT.StudentID = LEFT(USC.Email, 10)
-#            WHERE SMT.studentID = %s
-#        """
-#        cursor.execute(delete_query_1, (StudentID,))
-#        
-#        # SQL query to delete data from userclass table
-#        delete_query_2 = """
-#            DELETE USC
-#            FROM userclass USC
-#            INNER JOIN submitted SMT ON SMT.StudentID = LEFT(USC.Email, 10)
-#            WHERE SMT.studentID = %s
-#        """
-#        cursor.execute(delete_query_2, (StudentID,))
-#        
-#        # Commit the transaction
-#        conn.commit()
-#        
-#        return True  # Return True if deletion is successful
-#    
-#    except mysql.connector.Error as error:
-#        # Rollback the transaction in case of an error
-#        conn.rollback()
-#        print("An error occurred while deleting data:", error)
-#        return False  # Return False if deletion fails
-#    
-#    finally:
-#        # Close cursor and connection
-#        cursor.close()
-#        conn.close()
-            
+        return jsonify({"message":"An error occurred while delete class.","Status": False})                       
 
 @app.route("/TA/class/edit", methods=["POST"])
 def edit_class():

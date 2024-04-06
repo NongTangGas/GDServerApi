@@ -21,7 +21,7 @@ function Home() {
   
         // Fetch class data if user data is available
         if (userData) {
-          const classResponse = await fetch(`http://127.0.0.1:5000/class/classes?UID=${userData.ID}`);
+          const classResponse = await fetch(`http://127.0.0.1:5000/ST/class/classes?UID=${userData.ID}`);
           const classData = await classResponse.json();
           console.log('class:', classData);
           setClassData(classData);

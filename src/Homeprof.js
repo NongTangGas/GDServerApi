@@ -12,7 +12,7 @@ function Homeprof() {
   const [showAlert, setShowAlert] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const Email = '9876543210@student.chulac.ac.th';
+  const Email = '9876543210@student.chula.ac.th';
 
 
   const handleChange = (e) => {
@@ -35,14 +35,15 @@ function Homeprof() {
       const data = await response.json();
       console.log('user:', data);
       setUserData(data);
+      fetchClassData(data.ID);
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
 
-  const fetchClassData = async () => {
+  const fetchClassData = async (UID) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/class/classes?Email=${Email}`);
+      const response = await fetch(`http://127.0.0.1:5000/ST/class/classes?UID=${UID}`);
       const data = await response.json();
       console.log('class:', data);
       setClassData(data);
@@ -54,7 +55,6 @@ function Homeprof() {
   useEffect(() => {
     
     fetchUserData();
-    fetchClassData();
   }, []);
 
   const handleToggleExpand = () => {
