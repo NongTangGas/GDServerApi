@@ -6,6 +6,11 @@ import axios from 'axios';
 
 function Homeprof() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const classData = location.state;
+  const Email = '9876543210@student.chula.ac.th';
+  /* const Email = classData.Email; */
+  console.log(classData)
 
   const [userData, setUserData] = useState(null);
   const [courses, setCourses] = useState(null);
@@ -13,7 +18,7 @@ function Homeprof() {
   const [expanded, setExpanded] = useState(false);
   const [ready, setReady] = useState(null);
 
-  const Email = '9876543210@student.chula.ac.th';
+  
 
   const [expandedYear, setExpandedYear] = useState(null);
 
@@ -185,8 +190,8 @@ function Homeprof() {
                             <p className="card-text">{course.ClassID}</p>
                             <button onClick={() => navigate("/AssignList", { state: { Email: Email,classid: course.ID} })} className="btn btn-primary">View course</button>
                           </div>
-                          <div className="card-footer">
-                            <Link onClick={() => navigate("/ClassEdit", { state: { Email: Email,classid: course.ID} })} className="lini text-muted">Edit</Link>
+                          <div class="card-footer">
+                            <div style={{textDecoration: 'underline',color: 'blue',cursor: 'pointer',}} onClick={() => navigate("/ClassEdit", { state: { Email: Email,classid: course.ID, ClassID:course.ClassID, SchoolYear:year, ClassName:course.ClassName} })}>Edit</div>
                           </div>
                         </div>
                       </div>

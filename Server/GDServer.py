@@ -47,6 +47,9 @@ def isCSV(filename):
 def isIPYNB(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
 
+def isPicture(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
 #### Add CET
 def AddClassEditor(dbACE,cursor,Email,CSYID):
     try:
@@ -190,6 +193,22 @@ def UpdateStudentCSV(ClassID, SchoolYear):
     except Exception as e:
         print("An error occurred:", e)
  
+###Upload Thumbnail
+@app.route("/upload/Thumbnail", methods=["POST"])
+def upload_Thumbnail(uploaded_file,CSYID):
+
+    if uploaded_file and uploaded_file.filename != "":
+        filename = secure_filename(uploaded_file.filename)
+        filename = f"{CSYID}{os.path.splitext(uploaded_file.filename)[1]}"
+        filepath = os.path.join(UPLOAD_FOLDER,'Thumbnail',filename)        
+        try:
+            uploaded_file.save(filepath)
+            return True
+        except Exception as e:
+            print("Error saving file: {e}")
+            return False
+    return False
+ 
 ### get classes by Email       
 @app.route('/ST/class/classes', methods=['GET'])
 def get_classesdata():
@@ -249,22 +268,6 @@ def get_classesdata():
                 transformed_data[school_year].append(class_info)
 
         return jsonify(transformed_data)
-
-        """ transformed_data = []
-        for row in data:
-            cid, name, class_id, section, school_year, thumbnail, classcreator, classrole, csyid = row
-            transformed_data.append({
-                "ClassID": class_id,
-                "ClassName": name,
-                "ID": csyid,
-                "SchoolYear": school_year,
-                "Section": section,
-                "Thumbnail": thumbnail
-            }) """
-            
-        return jsonify(transformed_data)
-
-        
 
     except Exception as e:
         print(e)
@@ -327,7 +330,7 @@ def Editor_Class():
         return jsonify({'error': 'An error occurred'}), 500
 
 @app.route('/TA/class/classes/section', methods=['GET'])
-def ASLCP():
+def Editor_section():
     try:
         #Param
         UID = request.args.get('UID')
@@ -748,13 +751,32 @@ def delete_class():
 @app.route("/TA/class/edit", methods=["POST"])
 def edit_class():
     
-    ClassID = request.form.get('ClassID')
-    if not ClassID:
-        return jsonify({"error": "ClassID is required."}), 400
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    Section = request.form.get('Section')
     
     ClassName = request.form.get('ClassName')
-    Section = request.form.get('Section')
+    ClassID = request.form.get('ClassID')
     SchoolYear = request.form.get('SchoolYear')
+    CSYID = request.form.get('CSYID')
+    
+    csvfile = request.files.get['file1']
+    thumbnailfile = request.files.get['file2']
+    
+    update_class = """ 
+        UPDATE class
+        SET ClassName = %s,
+            ClassID = %s,
+            SchoolYear = %s,
+            Thumbnail = %s
+        WHERE CSYID = %s; 
+        """
+    cursor.execute(update_class, (ClassName, ClassID, SchoolYear, thumbnailfile.filename , CSYID))
+    
+    """ if file and file.filename != '': """
+        
+    conn.commit()
     
     # Handle CSV file
     success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
@@ -785,6 +807,58 @@ def edit_class():
         if 'cursor' in locals() and cursor:
             cursor.close()
             
+@app.route("/TA/class/score", methods=["GET"])
+def TAclass_score():
+    try:
+        
+        cursor = g.db.cursor()
+        
+        CSYID = request.args.get('CSYID')
+        Section = request.args.get('Section')
+
+        
+        query = """ 
+            SELECT 
+                STD.UID,
+                QST.Lab,
+                QST.Question,
+                LB.Name,
+                ASN.Due,
+                SMT.Timestamp,
+                QST.MaxScore,
+                SMT.Score,
+                CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
+                CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
+            FROM
+                question QST
+                INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab 
+                INNER JOIN section SCT ON SCT.CSYID = QST.CSYID
+                INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab AND ASN.Lab = LB.Lab AND ASN.CSYID = LB.CSYID
+                INNER JOIN student STD ON STD.CID = ASN.CID
+                LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
+            WHERE
+                QST.CSYID = %s
+                AND SCT.Section = %s
+            """
+        cursor.execute(query, (CSYID , Section))
+        
+        data = cursor.fetchall()
+        print('this is data:',data)
+        transformed_data = {}
+
+        for entry in data:
+            uid, lab, question, name, due, timestamp, max_score, score, turn_in, late = entry
+            if lab not in transformed_data:
+                transformed_data[lab] = {'Name': name, 'Due': due, 'Questions': {}}
+            if question not in transformed_data[lab]['Questions']:
+                transformed_data[lab]['Questions'][question] = {'MaxScore': max_score, 'Scores': {}}
+            transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Score': score, 'Timestamp': timestamp}
+
+
+        return jsonify(transformed_data)
+        
+    except mysql.connector.Error as error:
+        return jsonify({"error": f"An error occurred: {error}"}), 500
             
 @app.route("/TA/assignmnet/create", methods=["POST"])
 def create_assignment():
@@ -929,31 +1003,6 @@ def LabStudentList():
 
         # Convert the result to the desired structure
         return jsonify(transformed_data_list)
-
-        
-    
-    
-@app.route("/PostTester", methods=["POST"])
-def PostTester():
-    
-    # Get form data
-    data = request.get_json()
-    class_name = data.get('ClassName')
-    class_id = data.get('ClassID')
-    school_year = data.get('SchoolYear')
-    print('name:',class_name)
-    print('id:',class_id)
-    print('schoolyear:',school_year)
-    response = {
-        "message": "Data received successfully",
-        "Status": True,
-        "ClassName": class_name,
-        "ClassID": class_id,
-        "SchoolYear": school_year
-    }
-    return jsonify(response)
-
-
 
 
 if __name__ == '__main__':

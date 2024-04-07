@@ -12,7 +12,7 @@ function Home() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [ready, setReady] = useState(null);
 
-  const Email = '6331234567@student.chula.ac.th';
+  const Email = '5555555555@student.chula.ac.th';
 
   
   useEffect(() => {
@@ -84,9 +84,10 @@ function Home() {
                         <div className="card h-100" style={{width: '15rem'}}><div>
                           <img src={course.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
                           </div>
-                          <div className="card-body" style={{ overflowY: 'scroll' }}>
-                            <h5 className="card-title">{course.ClassName}</h5>
-                            <p className="card-text">{course.ClassID}</p>
+                          <div className="card-body" style={{ overflowY: 'scroll', height:'10rem',margin:'0',paddingBottom:"0"}}>
+                            <h5 style={{margin:"0"}} className="card-title">{course.ClassName}</h5>
+                            <p style={{margin:"0",marginTop:"5px"}} className="card-text">{course.ClassID}</p>
+                            <p style={{margin:"0",marginBottom:"15px"}} className="card-text">{year}</p>
                             <button onClick={() => navigate("/AssignList", { state: { Email: Email,classid: course.ID} })} className="btn btn-primary">View course</button>
                           </div>
                           <div className="card-footer">
