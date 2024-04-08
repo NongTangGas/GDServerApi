@@ -59,6 +59,17 @@ function Lab() {
     fetchUserData();
   }, [csyid, speclab]);
 
+  function generateBadge(status) {
+    if (status){
+      return (
+          <h5>
+              <span className={`badge bg-danger`}>
+                  Late
+              </span>
+          </h5>
+      );}
+  }
+
   const handleFileChange = (event, questionKey) => {
     // Update fileSelectedMap for the specific question with the file selection status
     setFileSelectedMap((prevMap) => ({
@@ -134,8 +145,9 @@ function Lab() {
                   <div className="col-sm-10">
                     <div className="card">
                       <div className="card-body row">
-                        <h5 className="card-title col-sm-6">Question {question.QuestionNum}</h5>
-                        <p className="card-text col-sm-5" style={{ textAlign: 'right' }}>{submissionResponses[questionKey].message}</p>
+                        <h5 className="card-title col-sm-4">Question {question.QuestionNum}</h5>
+                        <p className="card-text col-sm-6" style={{ textAlign: 'right' }}>{submissionResponses[questionKey].message}</p>
+                        <span className="col-sm-2">{generateBadge(question.Late)}</span>
                         
                         {/* Upload */}
                         <form 
@@ -158,7 +170,7 @@ function Lab() {
                           <div className="col-sm-10" style={{ display: 'inline' }}>
                             <div className="row">
                               <p className="card-text col-sm-9">At: {submissionResponses[questionKey].At ? new Date(submissionResponses[questionKey].At).toLocaleString():question.Submission.Date ? new Date(question.Submission.Date).toLocaleString():""}</p>
-                              <p className="card-text col-sm-3">Score: {submissionResponses[questionKey].Score||question.Score}</p>
+                              <p className="card-text col-sm-3">Score: {submissionResponses[questionKey].Score||question.Score || '-'}/{question.MaxScore}</p>
                             </div>
                           </div>
               

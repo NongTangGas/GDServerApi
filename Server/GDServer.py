@@ -504,9 +504,9 @@ def get_all():
                 LB.Name,
                 ASN.Due,
                 SMT.Timestamp,
-                QST.MaxScore,
-                SMT.Score,
-                CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
+                MaxScores.MaxScore AS Lab_MaxScore,
+                Scores.Score AS Lab_Score,
+                CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END AS TurnIn,
                 CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
             FROM
                 question QST
@@ -515,12 +515,25 @@ def get_all():
                 INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab
                 INNER JOIN student STD ON STD.UID = %s AND STD.CID = ASN.CID
                 LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
+                LEFT JOIN (
+                    SELECT Lab, SUM(MaxScore) AS MaxScore
+                    FROM question
+                    WHERE CSYID = %s
+                    GROUP BY Lab
+                ) AS MaxScores ON QST.Lab = MaxScores.Lab 
+                LEFT JOIN (
+                    SELECT Lab, SUM(Score) AS Score
+                    FROM submitted
+                    WHERE CSYID = %s
+                    GROUP BY Lab
+                ) AS Scores ON QST.Lab = Scores.Lab
             WHERE
-                QST.CSYID = %s
+                QST.CSYID = %s;
+
                  """
 
         # Execute a SELECT statement
-        cur.execute(query, (student_id,class_id))
+        cur.execute(query, (student_id,class_id,class_id,class_id))
         # Fetch all rows
         data = cur.fetchall()
 
@@ -538,6 +551,8 @@ def get_all():
                 transformed_data[lab] = {
                     'Name':name,
                     'Due':due_time,
+                    'Maxscore' :int(Maxscore) if Maxscore else 0,
+                    'Score' : int(score) if score else 0
                 }
         
             if question not in transformed_data[lab]:
@@ -576,7 +591,8 @@ def get_speclab():
                 SMT.Timestamp,
                 SMT.Score,
                 QST.MaxScore,
-                SMT.TurnInFile
+                SMT.TurnInFile,
+                CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
             FROM
                 question QST
                 INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab
@@ -601,7 +617,7 @@ def get_speclab():
         transformed_data_list = []
         
         for row in data:
-            lab, lab_name, question_id, question, due_time, submission_time, score, max_score, turn_in_file = row
+            lab, lab_name, question_id, question, due_time, submission_time, score, max_score, turn_in_file, Late = row
             lab_num = 'Lab' + str(lab)
 
             # Construct the question key
@@ -636,7 +652,8 @@ def get_speclab():
                         'FileName': turn_in_file,
                     },
                     'Score': score,
-                    'MaxScore': max_score
+                    'MaxScore': max_score,
+                    'Late': bool(Late)
                 }
 
             # Fetch files for the current lab and add them to the lab's 'Files' list
@@ -726,22 +743,13 @@ def create_class():
 @app.route("/TA/class/delete", methods=["POST"])
 def delete_class():
     
-    CSYID = request.args.get('CSYID')
-    ClassName = request.args.get('ClassName')
-    ClassID = request.args.get('ClassID')
-    SchoolYear = request.args.get('SchoolYear')
-    
-    CLS_data = (ClassName, ClassID, SchoolYear)
-
+    CSYID = request.form.get('CSYID')
     
     try:
         conn = get_db()
         cursor = conn.cursor()
-            
         insert_class_query = "DELETE FROM class WHERE CSYID = %s;"
         cursor.execute(insert_class_query, (CSYID))
-        
-        # Commit the transaction
         conn.commit()
         return jsonify({"Status": True}) 
     except mysql.connector.Error as error:
@@ -761,51 +769,98 @@ def edit_class():
     SchoolYear = request.form.get('SchoolYear')
     CSYID = request.form.get('CSYID')
     
-    csvfile = request.files.get['file1']
-    thumbnailfile = request.files.get['file2']
-    
-    update_class = """ 
-        UPDATE class
-        SET ClassName = %s,
-            ClassID = %s,
-            SchoolYear = %s,
-            Thumbnail = %s
-        WHERE CSYID = %s; 
-        """
-    cursor.execute(update_class, (ClassName, ClassID, SchoolYear, thumbnailfile.filename , CSYID))
-    
-    """ if file and file.filename != '': """
-        
-    conn.commit()
-    
-    # Handle CSV file
-    success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
-
-    # Handle Thumbnail file
-    success_thumbnail, PathToPicture2 = save_thumbnail_file(request.files.get('file2'))
-
-    if not (success_csv and success_thumbnail):
-        return jsonify({"error": "Failed to save one or more files."}), 500
-
+    print('Data:',ClassName, ClassID, SchoolYear, CSYID)
+    """ csvfile = request.files.get['file1']
+    thumbnailfile = request.files.get['file2'] """
+    """ Thumbnail = %s thumbnailfile.filename"""
     try:
-        # Establish MySQL connection
-        conn = get_db()
-        cursor = conn.cursor()
+        update_class = """ 
+            UPDATE class
+            SET ClassName = %s,
+                ClassID = %s,
+                SchoolYear = %s
+            WHERE CSYID = %s
+            """
+        cursor.execute(update_class, (ClassName, ClassID, SchoolYear, CSYID))
         
-        update_query = "UPDATE class SET Name = %s, Section = %s, SchoolYear = %s, PathToPicture1 = %s, PathToPicture2 = %s WHERE ClassID = %s"
-        cursor.execute(update_query, (ClassName, Section, SchoolYear, PathToPicture1, PathToPicture2, ClassID))
-
+        """ if file and file.filename != '': """
+            
         conn.commit()
-        
-        return jsonify({"message": "Class updated successfully!"})
+        return jsonify({"message":"class update successfully","Status": True})   
+        # Handle CSV file
+        """ success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
 
+        # Handle Thumbnail file
+        success_thumbnail, PathToPicture2 = save_thumbnail_file(request.files.get('file2'))
+
+        if not (success_csv and success_thumbnail):
+            return jsonify({"error": "Failed to save one or more files."}), 500
+
+        try:
+            # Establish MySQL connection
+            conn = get_db()
+            cursor = conn.cursor()
+            
+            update_query = "UPDATE class SET Name = %s, Section = %s, SchoolYear = %s, PathToPicture1 = %s, PathToPicture2 = %s WHERE ClassID = %s"
+            cursor.execute(update_query, (ClassName, Section, SchoolYear, PathToPicture1, PathToPicture2, ClassID))
+
+            conn.commit()
+            
+            return jsonify({"message": "Class updated successfully!"})
+
+        except mysql.connector.Error as error:
+            conn.rollback()
+            return jsonify({"error": f"An error occurred while updating class: {error}"}), 500 """
     except mysql.connector.Error as error:
         conn.rollback()
-        return jsonify({"error": f"An error occurred while updating class: {error}"}), 500
+        return jsonify({"message":"An error occurred while delete class.","Status": False})   
 
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
+@app.route("/TA/class/Assign", methods=["GET"])
+def TAclass_assignment():
+    try:
+        cursor = g.db.cursor()
+        
+        CSYID = request.args.get('CSYID')
+        Section = request.args.get('Section')
+                
+        query = """ 
+            SELECT
+                LB.Lab,
+                LB.Name,
+                SCT.Section,
+                ASN.Publish,
+                ASN.Due,
+                LB.CSYID
+            FROM
+                Lab LB
+                LEFT JOIN assign ASN ON LB.CSYID = ASN.CSYID AND LB.Lab = ASN.Lab
+                LEFT JOIN section SCT ON SCT.CSYID = LB.CSYID
+            WHERE 
+                LB.CSYID = %s
+                AND (ASN.CID IS NULL OR (SCT.Section = %s AND SCT.CID = ASN.CID))
+            """
+        cursor.execute(query, (CSYID , Section))
+        
+        data = cursor.fetchall()
+        
+        transformed_data = {
+            'Assignment': {}
+        }
+
+        for entry in data:
+            lab_number = entry[0]  # Assuming Lab is the first element in the tuple
+            transformed_data['Assignment'][f'Lab{lab_number}'] = {
+                'Name': entry[1],   # Assuming Name is the second element in the tuple
+                'Publish': entry[3].strftime("%d %b %Y") if entry[3] else None,  # Assuming Publish is the fourth element
+                'Due': entry[4].strftime("%d %b %Y") if entry[4] else None,      # Assuming Due is the fifth element
+                'LabNumber': lab_number
+            }
+
+        return jsonify(transformed_data)
+
+        
+    except mysql.connector.Error as error:
+        return jsonify({"error": f"An error occurred: {error}"}), 500
             
 @app.route("/TA/class/score", methods=["GET"])
 def TAclass_score():
@@ -815,14 +870,15 @@ def TAclass_score():
         
         CSYID = request.args.get('CSYID')
         Section = request.args.get('Section')
-
-        
+        Lab = request.args.get('Lab')
+                
         query = """ 
             SELECT 
                 STD.UID,
+                USR.Name,
                 QST.Lab,
                 QST.Question,
-                LB.Name,
+                LB.Name as LabName,
                 ASN.Due,
                 SMT.Timestamp,
                 QST.MaxScore,
@@ -836,26 +892,27 @@ def TAclass_score():
                 INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab AND ASN.Lab = LB.Lab AND ASN.CSYID = LB.CSYID
                 INNER JOIN student STD ON STD.CID = ASN.CID
                 LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
+                INNER JOIN user USR ON USR.UID = STD.UID
             WHERE
                 QST.CSYID = %s
                 AND SCT.Section = %s
-            """
-        cursor.execute(query, (CSYID , Section))
+                AND LB.Lab = %s
+            """ 
+        cursor.execute(query, (CSYID , Section, Lab))
         
         data = cursor.fetchall()
-        print('this is data:',data)
         transformed_data = {}
 
         for entry in data:
-            uid, lab, question, name, due, timestamp, max_score, score, turn_in, late = entry
+            uid, name, lab, question, lab_name, due, timestamp, max_score, score, turn_in, late = entry
             if lab not in transformed_data:
-                transformed_data[lab] = {'Name': name, 'Due': due, 'Questions': {}}
+                transformed_data[lab] = {'LabName': lab_name, 'Due': due, 'Questions': {}}
             if question not in transformed_data[lab]['Questions']:
                 transformed_data[lab]['Questions'][question] = {'MaxScore': max_score, 'Scores': {}}
-            transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Score': score, 'Timestamp': timestamp}
+            transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Name':name,'Score': score, 'Timestamp': timestamp,'Late':bool(late)}
 
 
-        return jsonify(transformed_data)
+        return jsonify(transformed_data[Lab])
         
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500

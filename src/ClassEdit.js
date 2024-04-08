@@ -16,6 +16,7 @@ function ClassEdit() {
     const [schoolYear, setSchoolYear] = useState('');
     const [className, setClassName] = useState('');
 
+    
     useEffect(() => {
         const PreData = async () => {
             if (classData) {
@@ -27,8 +28,25 @@ function ClassEdit() {
         
       }, [classData]);
 
-    const handleCreateClick = () => {
-      setShowAlert(true);
+    const handleEditClick = async () => {
+        const formData = new FormData();
+        formData.append('ClassName', className);
+        formData.append('ClassID',classID)
+        formData.append('SchoolYear',schoolYear)
+        formData.append('CSYID',CSYID)
+  
+    try {
+        const response = await fetch('http://127.0.0.1:5000/TA/class/edit', {
+            method: 'POST',
+            body: formData,
+      });
+        const responseData = await response.json();
+        console.log(responseData);
+        if (responseData.Status)
+            setShowAlert(true);
+    } catch (error) {
+        console.error('Error submitting data:', error);
+    }
     }
   
     const [timestamps, setTimestamps] = useState(Array(2).fill('')); // กำหนดขนาดของอาร์เรย์ตามจำนวนที่ต้องการใช้งาน (ในที่นี้คือ 2)
@@ -55,7 +73,25 @@ function ClassEdit() {
         };
 
       
+        const handleDelete = async () =>{
+            const formData = new FormData();
+            formData.append('CSYID',CSYID)
   
+    try {
+        const response = await fetch('http://127.0.0.1:5000/TA/class/delete', {
+            method: 'POST',
+            body: formData,
+      });
+        const responseData = await response.json();
+        console.log(responseData);
+        if (responseData.Status)
+            navigate("/Homeprof", { state: { Email: Email,classid: CSYID,delete:true} })
+    } catch (error) {
+        console.error('Error delete class:', error);
+    }
+    }
+
+
       const handleClassIDChange = (e) => {
           setClassID(e.target.value);
         }
@@ -89,7 +125,7 @@ function ClassEdit() {
                 </div>
                 <div class="col-md-3">
                     <label for="inputYear" class="form-label">School Year/Semester*</label>
-                    <input type="text" class="form-control" id="inputYear" placeholder="ex. 2566/1" value={schoolYear} onChange={handleSchoolYearChange}/>
+                    <input type="text" class="form-control" id="inputYear" placeholder="ex. 2020/1" value={schoolYear} onChange={handleSchoolYearChange}/>
                 </div>
                 <div class="col-6">
                     <label for="inputName" class="form-label">Class Name*</label>
@@ -113,7 +149,7 @@ function ClassEdit() {
                 </div>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                 <button onClick={() => navigate("/Homeprof", { state: { Email: Email,classid: CSYID} })} type="button" className="btn btn-primary">Back</button>
-                    <button type="button" class="btn btn-primary" disabled={isCreateButtonDisabled} onClick={handleCreateClick}>Save</button>
+                    <button type="button" class="btn btn-primary" disabled={isCreateButtonDisabled} onClick={handleEditClick}>Save</button>
                     
                     <button type="button" class="btn btn-danger" onClick={handleShowModal}>Delete</button>
                     <button onClick={Tester} type="button" className="btn btn-primary">
@@ -146,7 +182,7 @@ function ClassEdit() {
                             <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
                                 Cancel
                             </button>
-                            <button onClick={() => navigate("/Homeprof", { state: { Email: Email,classid: CSYID} })} type="button" className="btn btn-primary">
+                            <button onClick={() =>handleDelete()} type="button" className="btn btn-primary">
                                  Delete
                              </button>
                              

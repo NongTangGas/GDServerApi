@@ -8,12 +8,18 @@ function AssignList() {
   const navigate = useNavigate();
   const [assignmentsData, setAssignmentsData] = useState([
     {
+      ClassID: "2301170",
       Assignment: {
         Lab1: {
           Name: "helloworld",
           Publish: "12 Dec 2012",
           Due: "18 Dec 2012",
           LabNumber:"1",
+        }, Lab2: {
+          Name: "helloworld",
+          Publish: "12 Dec 2012",
+          Due: "18 Dec 2012",
+          LabNumber:"2",
         },
         
       },
@@ -23,10 +29,10 @@ function AssignList() {
     <div>
       <Navbarprof></Navbarprof>
       <br></br>
-      
       <div className="media d-flex align-items-center">
+      <span style={{ margin: '0 10px' }}></span>
         <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} />
-        &nbsp;&nbsp;&nbsp; 
+        <span style={{ margin: '0 10px' }}></span>
         <div className="card" style={{ width: '30rem', padding: '10px' }}>
             <h5>210xxx comp prog 2566/2 sec1</h5>
             <h6>Instructor: Name Surname</h6>
@@ -39,13 +45,13 @@ function AssignList() {
       <br></br>
       <div class="card" style={{ marginLeft: 10 +'em', marginRight: 10 + 'em' }}>
         <div class="card-header">
-          Assignments
+          <h5 style={{ display: 'inline-block' }}>Assignments</h5>
           <span style={{ margin: '0 10px' }}></span>
-          <Link to="/AssignCreate">
+          <Link to="/AssignCreate" className="float-right">
           <button class="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
           </Link>
         </div>
-        <div class="card-body">
+        <div class="card-body" style={{ overflowY: 'scroll' }}>
         <div>
                 {assignmentsData.map((assignment, assignmentIndex) => (
                   <div key={assignmentIndex}>
@@ -79,6 +85,11 @@ function AssignList() {
                     })}
                   </div>
                 ))}
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <Link to="/Homeprof">
+                              <button type="button" class="btn btn-primary">Back</button> 
+                              </Link>
+                </div>
               </div>
         </div>
       </div>

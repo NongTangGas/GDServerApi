@@ -73,7 +73,24 @@ function App() {
     const numTotalQuestions = parseInt(totalQuestions);
 
     const allTurnIn = numTurnIn === numTotalQuestions;
-    const anyLate = Object.values(labData).some(q => q.IsLate);
+    
+    let anyLate = false;
+
+    // Iterate over each lab in labData
+    for (const lab in labData) {
+        if (Object.prototype.hasOwnProperty.call(labData, lab)) {
+            // Iterate over each question in the lab
+            for (const question in labData[lab]) {
+                if (question.startsWith("Q")) {
+                    // Check if the question is late
+                    if (labData[lab][question].IsLate) {
+                        anyLate = true;
+                        break; // no need to continue checking if any question is late
+                    }
+                }
+            }
+        }
+    }
 
     let status;
     if (allTurnIn) {
@@ -98,6 +115,7 @@ function App() {
 
 
 
+
   return (
     
       <div className="App">
@@ -116,11 +134,6 @@ function App() {
                 <li className="nav-item">
                   <a className="nav-link active">Assignments</a>
                 </li>
-                <li className="nav-item">
-                <Link to="/Portfolio">
-                  <button className="nav-link link" >Portfolio</button>
-                  </Link>
-                </li>
               </ul>
             </div>
     
@@ -136,7 +149,10 @@ function App() {
                            <div className="fw-bold">
                              {lab}: {labInfo.Name}
                            </div>
-                           Due date: {labInfo.Due}
+                           <div className='row'>
+                           <div className='col-sm-12'>Due date: {labInfo.Due}</div>
+                           <div className='col-sm-12'>Score - ({labInfo.Score}/{labInfo.Maxscore})</div>
+                           </div>
                          </div>
                          {generateBadge(labInfo)}
                        </button>

@@ -17,8 +17,7 @@ function Homeprof() {
   const [showAlert, setShowAlert] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [ready, setReady] = useState(null);
-
-  
+  const [deleteAlert, setDeleteAlert] = useState(true);
 
   const [expandedYear, setExpandedYear] = useState(null);
 
@@ -103,6 +102,10 @@ function Homeprof() {
     setShowAlert(false);
   };
 
+  const handleDeleteClose = () => {
+    setDeleteAlert(false);
+  };
+  
   const handleCreateClick = async (e) => {
     e.preventDefault();
     console.log('Form Data:', formData);
@@ -122,6 +125,13 @@ function Homeprof() {
   return (
     <div>
       <Navbarprof />
+      {/* {location.state.delete && deleteAlert ? (
+                  <div className="alert alert-danger d-flex align-items-center" role="alert">
+                    Class created successfully
+                    <button type="button" className="btn-close align-items-right" aria-label="Close" onClick={handleDeleteClose}></button>
+                  </div>
+                ):(null)} */}
+
       {showAlert && (
                   <div className="alert alert-success d-flex align-items-center" role="alert">
                     Class created successfully
