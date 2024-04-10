@@ -819,10 +819,10 @@ def edit_class():
 def TAclass_assignment():
     try:
         cursor = g.db.cursor()
-        
+
         CSYID = request.args.get('CSYID')
         Section = request.args.get('Section')
-                
+
         query = """ 
             SELECT
                 LB.Lab,
@@ -832,32 +832,47 @@ def TAclass_assignment():
                 ASN.Due,
                 LB.CSYID
             FROM
-                Lab LB
-                LEFT JOIN assign ASN ON LB.CSYID = ASN.CSYID AND LB.Lab = ASN.Lab
-                LEFT JOIN section SCT ON SCT.CSYID = LB.CSYID
+                Lab LB 
+                INNER JOIN assign ASN ON LB.CSYID = ASN.CSYID AND LB.Lab = ASN.Lab 
+                INNER JOIN section SCT ON SCT.CSYID = LB.CSYID AND SCT.CID = ASN.CID
             WHERE 
                 LB.CSYID = %s
-                AND (ASN.CID IS NULL OR (SCT.Section = %s AND SCT.CID = ASN.CID))
+            ORDER BY
+	            Publish ASC,Lab DESC;
             """
-        cursor.execute(query, (CSYID , Section))
-        
-        data = cursor.fetchall()
-        
-        transformed_data = {
-            'Assignment': {}
-        }
+        cursor.execute(query, (CSYID))
 
-        for entry in data:
-            lab_number = entry[0]  # Assuming Lab is the first element in the tuple
-            transformed_data['Assignment'][f'Lab{lab_number}'] = {
-                'Name': entry[1],   # Assuming Name is the second element in the tuple
-                'Publish': entry[3].strftime("%d %b %Y") if entry[3] else None,  # Assuming Publish is the fourth element
-                'Due': entry[4].strftime("%d %b %Y") if entry[4] else None,      # Assuming Due is the fifth element
-                'LabNumber': lab_number
+        data = cursor.fetchall()
+
+        assignments = {}
+
+        for row in data:
+            lab_number = row[0]  # Accessing the first element in the tuple
+            lab_name = row[1]    # Accessing the second element in the tuple
+            section_number = row[2]  # Accessing the third element in the tuple
+            
+            # Convert 'Publish' and 'Due' strings to datetime objects
+            publish_date = row[3]
+            due_date = row[4]
+
+            # Create the structure if lab_number is not already a key in the assignments dictionary
+            if lab_number not in assignments:
+                assignments[lab_number] = {
+                    'LabName': lab_name,
+                    'Section': {}
+                }
+
+            # Add section information under the lab
+            assignments[lab_number]['Section'][section_number] = {
+                'Publish': publish_date,
+                'Due': due_date
             }
 
-        return jsonify(transformed_data)
+        # Wrap the assignments dictionary into a 'Assignment' key as you specified
+        result = {'Assignment': assignments}
 
+        # Return the result as JSON
+        return jsonify(result)
         
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500

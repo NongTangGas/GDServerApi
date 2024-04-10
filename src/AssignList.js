@@ -1,104 +1,115 @@
-import React from 'react'
-import Navbarprof from './Navbarprof'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react';
+import Navbarprof from './Navbarprof';
+import { Link } from 'react-router-dom';
 
-function AssignList() {
-  const navigate = useNavigate();
-  const [assignmentsData, setAssignmentsData] = useState([
-    {
-      ClassID: "2301170",
-      Assignment: {
-        Lab1: {
-          Name: "helloworld",
-          Publish: "12 Dec 2012",
-          Due: "18 Dec 2012",
-          LabNumber:"1",
-        }, Lab2: {
-          Name: "helloworld",
-          Publish: "12 Dec 2012",
-          Due: "18 Dec 2012",
-          LabNumber:"2",
-        },
-        
+function Testernaja() {
+  const [expandedLabs, setExpandedLabs] = useState({});
+  const [assignmentsData, setAssignmentsData] = useState({
+    "Assignment": {
+      "1": {
+        "LabName": "Genmaicha",
+        "Section": {
+          "1": {
+            "Due": "Tue, 28 Nov 2023 14:45:00 GMT",
+            "Publish": "Wed, 18 Oct 2023 14:45:00 GMT"
+          },
+          "2": {
+            "Due": "Sat, 20 Jan 2024 14:45:00 GMT",
+            "Publish": "Tue, 28 Nov 2023 14:45:00 GMT"
+          }
+        }
       },
-    },])
+      "2": {
+        "LabName": "Hojicha",
+        "Section": {
+          "1": {
+            "Due": "Thu, 28 Dec 2023 14:45:00 GMT",
+            "Publish": "Sat, 18 Nov 2023 14:45:00 GMT"
+          },
+          "2": {
+            "Due": "Tue, 20 Feb 2024 14:45:00 GMT",
+            "Publish": "Thu, 28 Dec 2023 14:45:00 GMT"
+          }
+        }
+      },
+      "3": {
+        "LabName": "Matcha",
+        "Section": {
+          "1": {
+            "Due": "Sat, 27 Dec 2025 14:45:00 GMT",
+            "Publish": "Sat, 20 Dec 2025 14:45:00 GMT"
+          }
+        }
+      }
+    }
+  });
+
+  const handleToggleLab = (labIndex) => {
+    setExpandedLabs((prevExpandedLabs) => ({
+      ...prevExpandedLabs,
+      [labIndex]: !prevExpandedLabs[labIndex],
+    }));
+  };
+
+  useEffect(() => {
+  }, []);
 
   return (
     <div>
-      <Navbarprof></Navbarprof>
+      <Navbarprof />
+
       <br></br>
       <div className="media d-flex align-items-center">
-      <span style={{ margin: '0 10px' }}></span>
+        <span style={{ margin: '0 10px' }}></span>
         <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} />
         <span style={{ margin: '0 10px' }}></span>
         <div className="card" style={{ width: '30rem', padding: '10px' }}>
-            <h5>210xxx comp prog 2566/2 sec1</h5>
-            <h6>Instructor: Name Surname</h6>
+          <h5>210xxx comp prog 2566/2 sec1</h5>
+          <h6>Instructor: Name Surname</h6>
         </div>
         <Link to="/StudentList">
-        <button type="button" class="btn btn-secondary" style={{ marginLeft: 40 +'em'}}>Student lists</button>
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: 40 + 'em' }}>Student lists</button>
         </Link>
       </div>
 
       <br></br>
-      <div class="card" style={{ marginLeft: 10 +'em', marginRight: 10 + 'em' }}>
-        <div class="card-header">
+      <div className="card" style={{ marginLeft: 10 + 'em', marginRight: 10 + 'em' }}>
+        <div className="card-header">
           <h5 style={{ display: 'inline-block' }}>Assignments</h5>
           <span style={{ margin: '0 10px' }}></span>
           <Link to="/AssignCreate" className="float-right">
-          <button class="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
+            <button className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
           </Link>
         </div>
-        <div class="card-body" style={{ overflowY: 'scroll' }}>
-        <div>
-                {assignmentsData.map((assignment, assignmentIndex) => (
-                  <div key={assignmentIndex}>
-                    {Object.keys(assignment.Assignment).map((labName, labIndex) => {
-                      const labInfo = assignment.Assignment[labName];
-                      return (
-                        <div key={labIndex} className="card-body">
-                          <ol className="list-group">
-                            <button onClick={() => navigate("/AssignEdit")} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
-                              <div className="container">
-                                <div class= "row align-items-start">
-                                  <div class="col">
-                                    <div className="fw-bold">
-                                    Lab{labInfo.LabNumber}: {labInfo.Name}
-                                    </div>
-                                  </div>
-                                  <div class="col">
-                                    <span className="fw-bold">Publish:</span> {labInfo.Publish}
-                                  </div>
-                                  <div class="col">
-                                    <span className="fw-bold">Due:</span> {labInfo.Due}
-                                  </div>
-                                </div>
-                                </div>
-              
-                            </button>
-                          </ol>
-                        </div>
+        <div className="card-body" style={{ overflowY: 'scroll' }}>
+          <div>
+            {Object.keys(assignmentsData.Assignment).map((labNumber, labIndex) => {
+              const lab = assignmentsData.Assignment[labNumber];
+              const isLabExpanded = expandedLabs[labIndex];
+              return (
+                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }}>
+  <button style={{ fontSize: '1.2rem', height:'4rem'}} class="fw-bold " onClick={() => handleToggleLab(labIndex)}>
+    <span>{`Lab ${labIndex + 1}: ${lab.LabName}`}</span>
+    {Object.keys(lab.Section).length > 0 && (
+      <span style={{ marginLeft: '2rem', fontWeight:'normal'}}>
+        (First Publish: {lab.Section[Object.keys(lab.Section)[0]].Publish} | Last Due: {lab.Section[Object.keys(lab.Section)[Object.keys(lab.Section).length - 1]].Due})
+      </span>
+    )}
+  </button>
+</div>
 
-                      );
-                    })}
-                  </div>
-                ))}
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <Link to="/Homeprof">
-                              <button type="button" class="btn btn-primary">Back</button> 
-                              </Link>
-                </div>
-              </div>
+              );
+            })}
+            <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+              <Link to="/Homeprof">
+                <button type="button" className="btn btn-primary">Back</button>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
-
-
-
-
     </div>
   )
 }
 
-export default AssignList
+export default Testernaja;

@@ -1,93 +1,115 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbarprof from './Navbarprof';
-import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 function Testernaja() {
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [PreData, setFormData] = useState({
-    SchoolYear: '',
-    ClassID: '',
-    file: null, // Initialize file as null
+  const [expandedLabs, setExpandedLabs] = useState({});
+  const [assignmentsData, setAssignmentsData] = useState({
+    "Assignment": {
+      "1": {
+        "LabName": "Genmaicha",
+        "Section": {
+          "1": {
+            "Due": "Tue, 28 Nov 2023 14:45:00 GMT",
+            "Publish": "Wed, 18 Oct 2023 14:45:00 GMT"
+          },
+          "2": {
+            "Due": "Sat, 20 Jan 2024 14:45:00 GMT",
+            "Publish": "Tue, 28 Nov 2023 14:45:00 GMT"
+          }
+        }
+      },
+      "2": {
+        "LabName": "Hojicha",
+        "Section": {
+          "1": {
+            "Due": "Thu, 28 Dec 2023 14:45:00 GMT",
+            "Publish": "Sat, 18 Nov 2023 14:45:00 GMT"
+          },
+          "2": {
+            "Due": "Tue, 20 Feb 2024 14:45:00 GMT",
+            "Publish": "Thu, 28 Dec 2023 14:45:00 GMT"
+          }
+        }
+      },
+      "3": {
+        "LabName": "Matcha",
+        "Section": {
+          "1": {
+            "Due": "Sat, 27 Dec 2025 14:45:00 GMT",
+            "Publish": "Sat, 20 Dec 2025 14:45:00 GMT"
+          }
+        }
+      }
+    }
   });
 
-  const handleChange = (e) => {
-    console.log(e.target);
-    if (e.target.name === 'file') {
-      const file = e.target.files[0];
-      setFormData({
-        ...PreData,
-        file: file
-      });
-    } else {
-      setFormData({
-        ...PreData,
-        [e.target.name]: e.target.value
-      });
-    }
+  const handleToggleLab = (labIndex) => {
+    setExpandedLabs((prevExpandedLabs) => ({
+      ...prevExpandedLabs,
+      [labIndex]: !prevExpandedLabs[labIndex],
+    }));
   };
-  
-  const handleGetStudent = async (e) => {
-    e.preventDefault();
-    const response = await fetch(`http://127.0.0.1:5000/TA/Student/List?class_id=${PreData.ClassID}&school_year=${PreData.SchoolYear}`);
-    const data = await response.json();
-    console.log(data);
-  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(PreData)
-    const formData = new FormData();
-    formData.append('ClassID', PreData.ClassID);
-    formData.append('SchoolYear', PreData.SchoolYear);
-    formData.append('file', PreData.file);
-
-
-    try {
-      const response = await fetch('http://127.0.0.1:5000/upload/CSV', {
-        method: 'POST',
-        body: formData,
-      });
-      const responseData = await response.json();
-      console.log(responseData);
-      // Update the submission response state for the specific question
-      console.log('response:',responseData)
-      console.log('Data submitted successfully!');
-      /* setMessage(response.data.message);
-      setError(''); */
-    } catch (error) {
-      console.error('Error submitting data:', error);
-      /* setMessage('');
-      setError(error.response.data.error); */
-    }
-  };
+  useEffect(() => {
+  }, []);
 
   return (
     <div>
       <Navbarprof />
-      <div className="container">
-        <h2>Upload CSV File</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="classID" className="form-label">Class ID:</label>
-            <input type="text" className="form-control" id="ClassID" name="ClassID" onChange={handleChange} required />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="schoolYear" className="form-label">School Year:</label>
-            <input type="text" className="form-control" id="SchoolYear" name="SchoolYear" onChange={handleChange} required />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="file" className="form-label">Choose CSV File:</label>
-            <input type="file" className="form-control" id="file" name="file" onChange={handleChange} required />
-          </div>
-          <button type="submit" className="btn btn-primary">Upload</button>
-        </form>
-        {message && <div className="alert alert-success mt-3" role="alert">{message}</div>}
-        {error && <div className="alert alert-danger mt-3" role="alert">{error}</div>}
+
+      <br></br>
+      <div className="media d-flex align-items-center">
+        <span style={{ margin: '0 10px' }}></span>
+        <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} />
+        <span style={{ margin: '0 10px' }}></span>
+        <div className="card" style={{ width: '30rem', padding: '10px' }}>
+          <h5>210xxx comp prog 2566/2 sec1</h5>
+          <h6>Instructor: Name Surname</h6>
+        </div>
+        <Link to="/StudentList">
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: 40 + 'em' }}>Student lists</button>
+        </Link>
       </div>
-      <button className="btn btn-primary" onClick={handleGetStudent}>getStudentList</button>
+
+      <br></br>
+      <div className="card" style={{ marginLeft: 10 + 'em', marginRight: 10 + 'em' }}>
+        <div className="card-header">
+          <h5 style={{ display: 'inline-block' }}>Assignments</h5>
+          <span style={{ margin: '0 10px' }}></span>
+          <Link to="/AssignCreate" className="float-right">
+            <button className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
+          </Link>
+        </div>
+        <div className="card-body" style={{ overflowY: 'scroll' }}>
+          <div>
+            {Object.keys(assignmentsData.Assignment).map((labNumber, labIndex) => {
+              const lab = assignmentsData.Assignment[labNumber];
+              const isLabExpanded = expandedLabs[labIndex];
+              return (
+                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }}>
+  <button style={{ fontSize: '1.2rem', height:'4rem'}} class="fw-bold " onClick={() => handleToggleLab(labIndex)}>
+    <span>{`Lab ${labIndex + 1}: ${lab.LabName}`}</span>
+    {Object.keys(lab.Section).length > 0 && (
+      <span style={{ marginLeft: '2rem', fontWeight:'normal'}}>
+        (First Publish: {lab.Section[Object.keys(lab.Section)[0]].Publish} | Last Due: {lab.Section[Object.keys(lab.Section)[Object.keys(lab.Section).length - 1]].Due})
+      </span>
+    )}
+  </button>
+</div>
+
+              );
+            })}
+            <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+              <Link to="/Homeprof">
+                <button type="button" className="btn btn-primary">Back</button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
 
 export default Testernaja;

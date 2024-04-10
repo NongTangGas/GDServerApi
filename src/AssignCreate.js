@@ -63,6 +63,9 @@ function AssignCreate() {
     } else {
       setCheckedSections([...checkedSections, section]);
     }
+    
+    // Sort sections
+    setSections([...sections].sort((a, b) => a - b));
   };
 
   const handleTotalQNumChange = (e) => {
@@ -119,7 +122,7 @@ function AssignCreate() {
       setScores([]);
   
       setShowAlert(true);
-      console.log('Form submitted!');
+      console.log('Form submitted!',data);
     } else {
       console.log('Please fill in all fields correctly.');
     }
@@ -208,32 +211,35 @@ function AssignCreate() {
               ))}
             </div>
               <br></br>
-              {checkedSections.map((section) => (
-                <div key={section} className="row">
-                  <div className="col-md-6">
-                    <label htmlFor={`PublishDate${section}`} className="form-label">Publish Date* for sec{section}</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      id={`publishdate${section}`}
-                      value={submittedDates[section]?.publishDate || ''}
-                      onChange={(e) => handlePublishDateChange(e, section)}
-                      min={currentDate}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label htmlFor={`DueDate${section}`} className="form-label">Due Date* for sec{section}</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      id={`duedate${section}`}
-                      value={submittedDates[section]?.dueDate || ''}
-                      onChange={(e) => handleDueDateChange(e, section)}
-                      min={submittedDates[section]?.publishDate || currentDate}
-                    />
-                  </div>
-                </div>
-              ))}
+              {sections
+  .filter(section => checkedSections.includes(section))
+  .map((section) => (
+    <div key={section} className="row">
+      <div className="col-md-6">
+        <label htmlFor={`PublishDate${section}`} className="form-label">Publish Date* for sec{section}</label>
+        <input
+          type="datetime-local"
+          className="form-control"
+          id={`publishdate${section}`}
+          value={submittedDates[section]?.publishDate || ''}
+          onChange={(e) => handlePublishDateChange(e, section)}
+          min={currentDate}
+        />
+      </div>
+      <div className="col-md-6">
+        <label htmlFor={`DueDate${section}`} className="form-label">Due Date* for sec{section}</label>
+        <input
+          type="datetime-local"
+          className="form-control"
+          id={`duedate${section}`}
+          value={submittedDates[section]?.dueDate || ''}
+          onChange={(e) => handleDueDateChange(e, section)}
+          min={submittedDates[section]?.publishDate || currentDate}
+        />
+      </div>
+    </div>
+  ))}
+
 
             <div className="d-grid gap-2 d-md-flex justify-content-md-end">
               <Link to="/AssignList">

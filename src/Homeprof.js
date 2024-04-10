@@ -20,7 +20,7 @@ function Homeprof() {
   const [deleteAlert, setDeleteAlert] = useState(true);
 
   const [expandedYear, setExpandedYear] = useState(null);
-
+  const [isdelete, setdelete] = useState(false);
   
 
 
@@ -64,6 +64,7 @@ function Homeprof() {
   
 
   useEffect(() => {
+    try{if(location.state.delete)setdelete(true)}catch{setdelete(false)}
     fetchUserData();
     fetchCourses();
     setReady(true);
@@ -125,12 +126,12 @@ function Homeprof() {
   return (
     <div>
       <Navbarprof />
-      {/* {location.state.delete && deleteAlert ? (
+      {isdelete && deleteAlert ? (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
                     Class created successfully
                     <button type="button" className="btn-close align-items-right" aria-label="Close" onClick={handleDeleteClose}></button>
                   </div>
-                ):(null)} */}
+                ):(null)}
 
       {showAlert && (
                   <div className="alert alert-success d-flex align-items-center" role="alert">
