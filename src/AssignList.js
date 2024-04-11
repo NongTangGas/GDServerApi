@@ -8,6 +8,8 @@ function AssignList() {
   const [expandedLabs, setExpandedLabs] = useState({});
   const navigate = useNavigate();
   const location = useLocation();
+  const [isCreate, setAssignCreate] = useState(false);
+  const [isEdit, setAssignEdit] = useState(false);
 
   const classData = location.state;
   const Email = classData.Email;
@@ -91,7 +93,8 @@ function AssignList() {
         console.error('Error fetching data:', error);
       }
     };
-  
+    try{setAssignCreate(classData.statusCreate)}catch{}
+    try{setAssignEdit(classData.statusEdit)}catch{}
     fetchUserData();
     fetchData()
   }, []);
@@ -116,6 +119,16 @@ function AssignList() {
       </div>
 
       <br></br>
+      {isCreate && (
+              <div className="alert alert-success d-flex align-items-center" role="alert">
+                Assignment created successfully
+              </div>
+            )}
+      {isEdit && (
+              <div className="alert alert-success d-flex align-items-center" role="alert">
+                Assignment Edit successfully
+              </div>
+            )}
       <div className="card" style={{ marginLeft: 10 + 'em', marginRight: 10 + 'em' }}>
         <div className="card-header">
           <h5 style={{ display: 'inline-block' }}>Assignments</h5>
@@ -128,9 +141,9 @@ function AssignList() {
               const lab = assignmentsData.Assignment[labNumber];
               const isLabExpanded = expandedLabs[labIndex];
               return (
-                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }} onClick={() => navigate("/AssignEdit", { state: { Email: Email,lab:labNumber,classid:classId} })}>
+                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }} onClick={() => navigate("/AssignEdit", { state: { Email: Email,classid:classId,lab:labNumber,labname:lab.LabName} })}>
                   <button  style={{ fontSize: '1.2rem', height:'4rem'}} class="fw-bold ">
-                    <span>{`Lab ${labIndex + 1}: ${lab.LabName}`}</span>
+                    <span>{`Lab ${labNumber}: ${lab.LabName}`}</span>
                     {Object.keys(lab.Section).length > 0 && (
                       <span style={{ marginLeft: '2rem', fontWeight:'normal'}}>
                         (First Publish: {lab.Section[Object.keys(lab.Section)[0]].Publish} | Last Due: {lab.Section[Object.keys(lab.Section)[Object.keys(lab.Section).length - 1]].Due})

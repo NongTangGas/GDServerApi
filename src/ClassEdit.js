@@ -153,10 +153,6 @@ function ClassEdit() {
           setClassName(e.target.value);
         }
         const isCreateButtonDisabled = !classID || !schoolYear || !className;
-
-        const Tester = () => {
-            console.log(classID, className, schoolYear);
-        };
         
   return (
     <div>
@@ -201,9 +197,6 @@ function ClassEdit() {
                     <button type="button" class="btn btn-primary" disabled={isCreateButtonDisabled} onClick={handleEditClick}>Save</button>
                     
                     <button type="button" class="btn btn-danger" onClick={handleShowModal}>Delete</button>
-                    <button onClick={Tester} type="button" className="btn btn-primary">
-                        Test
-                    </button>
 
                 </div>
             </div>

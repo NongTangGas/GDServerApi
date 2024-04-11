@@ -7,6 +7,7 @@ import mysql.connector
 import csv
 from datetime import datetime
 import pytz
+import json
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
@@ -126,6 +127,92 @@ def AddUserClass(dbAUC, cursor, UID, CSYID, Section):
         dbAUC.rollback()
         print("An error occurred:", e)   
         return False   
+    
+@app.route("/section", methods=["GET"])
+def get_section():
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    CSYID = request.args.get("CSYID")
+    section_query = """SELECT SCT.Section FROM section SCT WHERE SCT.CSYID = %s"""
+    cursor.execute(section_query, (CSYID,))
+    data = cursor.fetchall()
+    
+    # Transform the fetched data into a list of section values
+    transformdata = [row[0] for row in data]
+    
+    return jsonify(transformdata)
+
+@app.route("/TA/class/Assign/data", methods=["GET"])
+def get_assigndata():
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    LabNumber = request.args.get("labnumber")
+    CSYID = request.args.get("CSYID")
+    
+    transformdata = {}
+    
+    # Query for question datetime
+    question_datetime_query = """
+    SELECT
+        SCT.Section,
+        ASN.Publish,
+        ASN.Due
+    FROM
+        section SCT
+        INNER JOIN assign ASN ON SCT.CID = ASN.CID
+    WHERE 
+        SCT.CSYID = %s
+        AND ASN.Lab = %s
+    """
+    cursor.execute(question_datetime_query, (CSYID, LabNumber))
+    datetime_data = cursor.fetchall()
+    
+    # Transform datetime data
+    transformdata['LabTime'] = {}
+    for row in datetime_data:
+        section = row[0]
+        publish = row[1]
+        due = row[2]
+        transformdata['LabTime'][section] = {'Publish': publish, 'Due': due}
+    
+    # Query for question and max score
+    question_questionsscore_query = """
+    SELECT
+        QST.Question,
+        QST.MaxScore
+    FROM
+        question QST
+    WHERE 
+        QST.CSYID = %s
+        AND QST.Lab = %s
+    """
+    cursor.execute(question_questionsscore_query, (CSYID, LabNumber))
+    question_data = cursor.fetchall()
+    
+    # Transform question and max score data
+    transformdata['Question'] = [{"id": q[0], "score": q[1]} for q in question_data]
+    
+    # Query for additional files
+    question_addfile_query = """
+    SELECT
+        ADF.PathToFile
+    FROM
+        addfile ADF
+    WHERE
+        ADF.CSYID = %s
+        AND ADF.Lab = %s
+    """
+    cursor.execute(question_addfile_query, (CSYID, LabNumber))
+    file_data = cursor.fetchall()
+    
+    # Transform file data
+    transformdata['file'] = [f[0] for f in file_data]
+
+    return jsonify(transformdata)
+
     
 @app.route("/upload/CSV", methods=["POST"])
 def addstudentclass():
@@ -672,33 +759,6 @@ def get_speclab():
         return jsonify({'error': 'An error occurred'}), 500
     
 """ TA API """
-#Save CSV(Create and Edit Class)
-def save_csv_file(ClassID, SchoolYear, file):
-    if file and file.filename != '':
-        try:
-            
-            filename = f"{ClassID}-{SchoolYear}{os.path.splitext(file.filename)[1]}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'CSV', filename)
-            file.save(filepath)
-            return True, os.path.join('File1', filename)  # Success flag and relative path
-        except Exception as e:
-            print(f"Error saving CSV file: {e}")
-            return False, None  # Return False if saving failed
-    return True, None  # Return True if no file to save
-
-#Save Thumbnail(Create and Edit Class)
-def save_thumbnail_file(file):
-    if file and file.filename != '':
-        try:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'Thumbnail', filename)
-            file.save(filepath)
-            return True, filename  # Success flag and filename
-        except Exception as e:
-            print(f"Error saving thumbnail file: {e}")
-            return False, None  # Return False if saving failed
-    return True, None  # Return True if no file to save
-
 @app.route("/TA/class/create", methods=["POST"])
 def create_class():
     DataJ = request.get_json()
@@ -773,35 +833,8 @@ def edit_class():
             WHERE CSYID = %s
             """
         cursor.execute(update_class, (ClassName, ClassID, SchoolYear, CSYID))
-        
-        """ if file and file.filename != '': """
-            
         conn.commit()
-        return jsonify({"message":"class update successfully","Status": True})   
-        # Handle CSV file
-        """ success_csv, PathToPicture1 = save_csv_file(ClassID, Section, SchoolYear, request.files.get('file1'))
-
-        # Handle Thumbnail file
-        success_thumbnail, PathToPicture2 = save_thumbnail_file(request.files.get('file2'))
-
-        if not (success_csv and success_thumbnail):
-            return jsonify({"error": "Failed to save one or more files."}), 500
-
-        try:
-            # Establish MySQL connection
-            conn = get_db()
-            cursor = conn.cursor()
-            
-            update_query = "UPDATE class SET Name = %s, Section = %s, SchoolYear = %s, PathToPicture1 = %s, PathToPicture2 = %s WHERE ClassID = %s"
-            cursor.execute(update_query, (ClassName, Section, SchoolYear, PathToPicture1, PathToPicture2, ClassID))
-
-            conn.commit()
-            
-            return jsonify({"message": "Class updated successfully!"})
-
-        except mysql.connector.Error as error:
-            conn.rollback()
-            return jsonify({"error": f"An error occurred while updating class: {error}"}), 500 """
+        return jsonify({"message":"class update successfully","Status": True})
     except mysql.connector.Error as error:
         conn.rollback()
         return jsonify({"message":"An error occurred while delete class.","Status": False})   
@@ -810,9 +843,7 @@ def edit_class():
 def TAclass_assignment():
     try:
         cursor = g.db.cursor()
-
         CSYID = request.args.get('CSYID')
-        Section = request.args.get('Section')
 
         query = """ 
             SELECT
@@ -871,7 +902,6 @@ def TAclass_assignment():
 @app.route("/TA/class/Assign/Create", methods=["POST"])
 def TAclass_assignmentcreate():
     try:
-        
         conn = get_db()
         cursor = conn.cursor()
         
@@ -879,45 +909,165 @@ def TAclass_assignmentcreate():
         LabNum = request.form.get('labNum')
         LabName = request.form.get('labName')
         CSYID = request.form.get('CSYID')
-        Question = request.form.get('Question')
-        submittedDates = request.form.get('submittedDates')
+        Question = json.loads(request.form.get('Question'))
+        submittedDates = json.loads(request.form.get('submittedDates'))
         Create_time = datetime.now(gmt_timezone)
-
-
-        #create Lab first
-        select_lab_query = "SELECT * FROM lab WHERE Lab = %s AND CSYID = %s"
+        
+        #check if lab already exist
+        select_lab_query = "SELECT Lab,Name,CSYID FROM lab WHERE Lab = %s AND CSYID = %s"
         cursor.execute(select_lab_query, (LabNum, CSYID))
         exist_lab = cursor.fetchone()
 
         if exist_lab:
             return jsonify({"message": "Lab already exists. Please select a different Lab number.","Status":1}), 500
         else:
-            insert_lab_query = "INSERT INTO question (Lab, Name, CSYID) VALUES (%s, %s, %s)"
+            #create Lab first
+            insert_lab_query = "INSERT INTO lab (Lab, Name, CSYID) VALUES (%s, %s, %s)"
             cursor.execute(insert_lab_query, (LabNum, LabName, CSYID))
 
-        #create Question
-        for id, data in Question.items():
-            score = data['score']
-            # Insert question data into the database
-            insert_question_query = "INSERT INTO your_table_name (Creator, Lab, Question, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s)"
-            cursor.execute(insert_question_query, (Creator, LabNum, id, score, Create_time, CSYID))
+            #create Question
+            for question_data in Question:
+                try:
+                    question_id = question_data['id']
+                    score = question_data['score']
+                    # Insert question data into the database
+                    insert_question_query = "INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s)"
+                    cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
+                except mysql.connector.Error as error:
+                    conn.rollback()
+                    return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
 
-        #assign to section
-        for section, dates in submittedDates.items():
-            Publish = dates['publishDate']
-            Due = dates['dueDate']
-            CID = GetCID(conn,cursor,section,CSYID)
-            insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
-            cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
+            #assign to section
+            for section, dates in submittedDates.items():
+                Publish = dates['publishDate']
+                Due = dates['dueDate']
+                CID = GetCID(conn,cursor,section,CSYID)
+                insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
+                cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
 
-        conn.commit()
-    
-        return jsonify({"message":"create success","Status":2}), 500
+            conn.commit()
+            return jsonify({"message":"create success","Status":True}), 500
         
     except mysql.connector.Error as error:
         conn.rollback()
-        return jsonify({"error": f"An error occurred: {error}","Status":3}), 500
+        return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+
+@app.route("/TA/class/Assign/delete", methods=["POST"])
+def TAclass_assignmentdelete():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        LabNum = request.form.get('oldlabNum')
+        CSYID = request.form.get('CSYID')
+
+        #just delete lab
+        
+        delete_lab_query = "DELETE LB FROM lab LB WHERE LB.Lab = %s AND LB.CSYID = %s"
+        cursor.execute(delete_lab_query, (LabNum, CSYID))        
+        conn.commit()
+        return jsonify({"message":"delete success","Status":True}), 500
+        
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
                 
+@app.route("/TA/class/Assign/Edit", methods=["POST"])
+def TAclass_assignmentedit():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        Creator = request.form.get('Creator') #no change
+        CSYID = request.form.get('CSYID') #no change
+        Create_time = datetime.now(gmt_timezone) #no change
+        
+        oldLabNum = request.form.get('oldlabNum')
+        oldQuestion = json.loads(request.form.get('oldQuestion'))
+        oldsubmittedDates = json.loads(request.form.get('oldsubmittedDates'))
+        
+        
+        LabNum = request.form.get('labNum')
+        LabName = request.form.get('labName')
+        Question = json.loads(request.form.get('Question'))
+        submittedDates = json.loads(request.form.get('submittedDates'))
+        
+        
+
+        #check lab exist
+        select_lab_query = "SELECT Lab,Name,CSYID FROM lab WHERE Lab = %s AND CSYID = %s"
+        cursor.execute(select_lab_query, (LabNum, CSYID))
+        exist_lab = cursor.fetchone()
+
+        if exist_lab:
+            return jsonify({"message": "Lab already exists. Please select a different Lab number.","Status":1}), 500
+        else:
+            
+            #update lab
+            update_lab_query = """ UPDATE lab SET Lab = %s,Name = %s WHERE Lab = %s AND CSYID = %s """
+            
+            cursor.execute(update_lab_query, (LabNum, LabName, oldLabNum, CSYID))
+
+            
+            #update Question
+            try:
+                for question_data in Question:
+                    question_id = question_data['id']
+                    score = question_data['score']
+                    # Insert question data into the database
+                    insert_question_query = """ 
+                        INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID)
+                        VALUES (%s, %s, %s, %s, %s, %s) AS new
+                        ON DUPLICATE KEY UPDATE MaxScore = new.MaxScore,LastEdit = new.LastEdit
+                    """
+                    cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
+                    maxQuestion = question_id
+            
+            except mysql.connector.Error as error:
+                conn.rollback()
+                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+
+            #delete unuse Question
+            try:
+                delete_question_query = """ 
+                        DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question > %s
+                    """
+                cursor.execute(delete_question_query, (LabNum, CSYID, maxQuestion))
+                    
+            except mysql.connector.Error as error:
+                    conn.rollback()
+                    return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+
+            #delete old assign
+            try:
+                delete_assign_query = """ 
+                        DELETE ASN FROM assign ASN WHERE ASN.Lab = %s AND ASN.CSYID = %s
+                    """
+                cursor.execute(delete_assign_query, (LabNum, CSYID))
+                
+            except mysql.connector.Error as error:
+                conn.rollback()
+                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+            
+            #assign to section
+            try:
+                for section, dates in submittedDates.items():
+                    Publish = dates['publishDate']
+                    Due = dates['dueDate']
+                    CID = GetCID(conn,cursor,section,CSYID)
+                    insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
+                    cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
+            except mysql.connector.Error as error:
+                conn.rollback()
+                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+
+            conn.commit()
+            return jsonify({"message":"create success","Status":True}), 500
+        
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+    
 @app.route("/TA/class/score", methods=["GET"])
 def TAclass_score():
     try:
@@ -972,69 +1122,6 @@ def TAclass_score():
         
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500
-            
-@app.route("/TA/assignmnet/create", methods=["POST"])
-def create_assignment():
-    
-    
-    Lab = ''
-    Name = ''
-    ClassID = ''
-    SchoolYear = ''
-    Publish = ''
-    Due = ''
-    AssignTo = ''
-    Creator = ''
-    MaxScore = []
-    File = []
-    
-    
-    ASN_data = (Lab, AssignTo, Publish, Due, ClassID, SchoolYear)
-    
-    
-    try:
-        # Establish MySQL connection
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Loop นับจำนวน Question จาก score แล้ว Insert all
-        for QSTNum, MS in enumerate(MaxScore):
-            Question = QSTNum+1
-            MScore = MS
-            QST_data = (Creator, Lab, Question, Name, MScore, ClassID, SchoolYear)
-
-            insert_question_query = "INSERT INTO question (Creator, LAB, Question, Name, MaxScore, ClassID, SchoolYear) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(insert_question_query, QST_data)
-        
-        # File path แจก all
-        for filepath in File:
-            eachFile = filepath
-            
-            File_data = (Lab, eachFile, ClassID, SchoolYear)
-            insert_file_query = "INSERT INTO file_paths (LAB, PathToFile, ClassID, SchoolYear) VALUES (%s, %s, %s, %s)"
-            try:
-                cursor.execute(insert_file_query, File_data)
-            except mysql.connector.Error as error:
-                print("Error inserting file path '{eachFile}': {error}")
-        
-        # Assignment Data Insert
-        insert_assign_query = "INSERT INTO assign (LAB, AssignTo, PublishTime, DueTime, ClassID, SchoolYear) VALUES (%s, %s, %s, %s, %s, %s)"
-        cursor.execute(insert_assign_query, ASN_data)
-
-        # Commit the transaction
-        conn.commit()
-        
-        return jsonify({"message": "Data inserted successfully!"})
-
-    except mysql.connector.Error as error:
-        # Rollback transaction in case of an error
-        conn.rollback()
-        return jsonify({"error": f"An error occurred while inserting data: {error}"}), 500
-
-    finally:
-        # Close the cursor and MySQL connection
-        if 'cursor' in locals() and cursor:
-            cursor.close()
 
 @app.route("/TA/Student/LabList", methods=["GET"])
 def LabStudentList():

@@ -50,6 +50,20 @@ function AssignCreate() {
     }
   };
   
+  useEffect(() => {
+    const fetchSection = async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:5000/section?CSYID=${classId}`);
+        const data = await response.json();
+        console.log('sections:', data);
+        setSections(data);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    fetchSection()
+  }, []);
+  
   const handleDueDateChange = (e, section) => {
     const selectedDueDate = new Date(e.target.value);
     const selectedPublishDate = new Date(submittedDates[section]?.publishDate); // ใช้ข้อมูล publishDate ของ section เดียวกัน
@@ -114,28 +128,31 @@ function AssignCreate() {
     );
   };
   
-  const handleButtonClick = () => {
+  const handleButtonClick = async () => {
+    const formData = new FormData();
+    formData.append('Creator', Email);
+    formData.append('labNum', labNum);
+    formData.append('labName', labName);
+    formData.append('CSYID', classId);
+    formData.append('Question', JSON.stringify(Question)); // Stringify Question array
+    formData.append('submittedDates', JSON.stringify(submittedDates)); // Stringify submittedDates object
     if (isFormValid()) {
-      const data = {
-        labNum,
-        labName,
-        sections,
-        Question: Question,
-        submittedDates // ส่งข้อมูลที่เกี่ยวข้องกับแต่ละ section
-        /* CSYID + Creator */
-      };
-      setSubmittedData(data);
-  
-      setLabNum('');
-      setLabName('');
-      setSections([1, 2, 3, 4, 5]); // รีเซ็ต sections เป็นค่าเริ่มต้น
-      setPublishDate('');
-      setDueDate('');
-      setTotalQNum('');
-      setScores([]);
+      try {
+        
+        const response = await fetch('http://127.0.0.1:5000/TA/class/Assign/Create', {
+              method: 'POST',
+              body: formData,
+        })
+        console.log(response)
+
+      } catch (error) {
+        console.error('Error');
+      }
+
+      
   
       setShowAlert(true);
-      console.log('Form submitted!',data);
+      console.log('Form submitted!',formData);
     } else {
       console.log('Please fill in all fields correctly.');
     }
