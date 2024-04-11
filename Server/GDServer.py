@@ -56,6 +56,7 @@ def isCSV(filename):
 def isIPYNB(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
 
+#*******picture check and delete old picture ด้วย
 def isPicture(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -112,6 +113,7 @@ def CreateSection(dbCST, cursor, CSYID, Section):
     except Exception as e:
         dbCST.rollback()
         return False
+    
 ### Add a User in class
 def AddUserClass(dbAUC, cursor, UID, CSYID, Section):
     try:
@@ -147,12 +149,12 @@ def addstudentclass():
             delete_student_class = """DELETE STD FROM student STD INNER JOIN section SCT ON STD.CID = SCT.CID WHERE SCT.CSYID = %s"""
             cursor.execute(delete_student_class, (CSYID,))
 
-
             
             #read file and add user
             with open(filepath, newline='') as csvfile:
                 reader = csv.reader(csvfile)
                 next(reader, None)
+                maxSection = 1
                 for row in reader:
                     print(row)
                     UID, Name, Section = row
@@ -160,6 +162,9 @@ def addstudentclass():
                     AddUserGrader(conn, cursor, Email, UID, Name)
                     CreateSection(conn, cursor, CSYID, Section)
                     AddUserClass(conn, cursor, UID, CSYID, Section)
+                    if(maxSection < Section):maxSection=Section
+            #clear unused section
+                    
             conn.commit()
             return jsonify({"message": "File uploaded successfully!"})
         except FileNotFoundError:
@@ -320,7 +325,7 @@ def Editor_section():
         
         # Create a cursor
         cur = g.db.cursor()
-
+        
         query = """
             SELECT DISTINCT
                 SCT.CID,

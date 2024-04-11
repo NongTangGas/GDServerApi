@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import Navbarprof from './Navbarprof'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 
 function Homeprof() {
   const navigate = useNavigate();
@@ -111,7 +110,10 @@ function Homeprof() {
     e.preventDefault();
     console.log('Form Data:', formData);
     try {
-      const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData);
+      const response = await fetch('http://127.0.0.1:5000/TA/class/create', {
+            method: 'POST',
+            body: formData,
+      })
       console.log(response)
       if (response.data.Status) {
         fetchCourses();
