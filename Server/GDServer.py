@@ -163,8 +163,10 @@ def addstudentclass():
                     CreateSection(conn, cursor, CSYID, Section)
                     AddUserClass(conn, cursor, UID, CSYID, Section)
                     if(maxSection < Section):maxSection=Section
-            #clear unused section
-                    
+                #clear unused section
+                delete_student_class = """DELETE SCT FROM section SCT WHERE SCT.CSYID = %s AND SCT.Section > %s"""
+                cursor.execute(delete_student_class, (CSYID,maxSection))
+            
             conn.commit()
             return jsonify({"message": "File uploaded successfully!"})
         except FileNotFoundError:
