@@ -1,8 +1,19 @@
-import React, { useState } from 'react';
-import Navbarprof from './Navbarprof';
+import React, { useState, useEffect } from 'react';
+import Navbarprof from './Navbarprof'
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 function AssignCreate() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const classData = location.state;
+  const Email = classData.Email;
+  const classId = classData.classid;
+
+  console.log(classData)
+
   const [showAlert, setShowAlert] = useState(false);
   const [labNum, setLabNum] = useState('');
   const [labName, setLabName] = useState('');
@@ -15,6 +26,8 @@ function AssignCreate() {
   const [checkedSections, setCheckedSections] = useState([]);
   const currentDate = new Date().toISOString().slice(0, 16);
   const [submittedDates, setSubmittedDates] = useState({});
+
+
 
   const handlePublishDateChange = (e, section) => {
     const selectedPublishDate = new Date(e.target.value);
@@ -110,6 +123,7 @@ function AssignCreate() {
         sections,
         Question: Question,
         submittedDates // ส่งข้อมูลที่เกี่ยวข้องกับแต่ละ section
+        /* CSYID + Creator */
       };
       setSubmittedData(data);
   
@@ -242,9 +256,7 @@ function AssignCreate() {
 
 
             <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-              <Link to="/AssignList">
-                <button type="button" className="btn btn-primary">Back</button>
-              </Link>
+                <button type="button" className="btn btn-primary" onClick={() => navigate("/AssignList", { state: { Email: Email,classid:classId} })}>Back</button>
               <button type="button" className="btn btn-primary" id="liveToastBtn" onClick={handleButtonClick} disabled={!isFormValid()}>Submit</button>
             </div>
 

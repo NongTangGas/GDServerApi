@@ -51,26 +51,65 @@ function ClassEdit() {
   
     const [timestamps, setTimestamps] = useState(Array(2).fill('')); // กำหนดขนาดของอาร์เรย์ตามจำนวนที่ต้องการใช้งาน (ในที่นี้คือ 2)
 
-    const handleUpload = (index) => {
+    const handleUpload = async (index) => {
       // Get the current date and time
       const now = new Date();
       const formattedTimestamp = now.toLocaleString();
+      const response = null
   
 
       /* Thumbnail */
       if(index == 0){
+        const fileInput = document.getElementById('inputGroupFile01');
+        const fileThumbnail = fileInput.files[0];
 
+        const formData = new FormData();
+        formData.append('CSYID', CSYID)
+        formData.append('file',fileThumbnail)
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/upload/Thumbnail', {
+                method: 'POST',
+                body: formData,
+          });
+            const responseData = await response.json();
+            console.log(responseData);
+            if (responseData.Status)
+                setShowAlert(true);
+        } catch (error) {
+            console.error('Error submitting data:', error);
+        }
+        
       }
       /* CSV */
       if(index == 1){
+        const fileInput = document.getElementById('inputGroupFile02');
+        const fileCSV = fileInput.files[0];
 
+        const formData = new FormData();
+        formData.append('CSYID', CSYID)
+        formData.append('file',fileCSV)
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/upload/CSV', {
+                method: 'POST',
+                body: formData,
+          });
+            const responseData = await response.json();
+            console.log(responseData);
+            if (responseData.Status)
+                setShowAlert(true);
+        } catch (error) {
+            console.error('Error submitting data:', error);
+        }
       }
-      // Update the timestamp state
-      setTimestamps(prevTimestamps => {
-        const newTimestamps = [...prevTimestamps];
-        newTimestamps[index] = formattedTimestamp;
-        return newTimestamps;
-      });
+
+      if(response){
+        setTimestamps(prevTimestamps => {
+            const newTimestamps = [...prevTimestamps];
+            newTimestamps[index] = formattedTimestamp;
+            return newTimestamps;
+      })};
   };
         const [showModal, setShowModal] = useState(false);
 

@@ -4,14 +4,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
-function Testernaja() {
+function AssignList() {
   
   const [expandedLabs, setExpandedLabs] = useState({});
   const navigate = useNavigate();
   const location = useLocation();
+
   const classData = location.state;
   const Email = classData.Email;
   const classId = classData.classid;
+  console.log(classData)
 
   const [userData, setUserData] = useState(null);
 
@@ -119,9 +121,7 @@ function Testernaja() {
         <div className="card-header">
           <h5 style={{ display: 'inline-block' }}>Assignments</h5>
           <span style={{ margin: '0 10px' }}></span>
-          <Link to="/AssignCreate" className="float-right">
-            <button className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>
-          </Link>
+            <button className="btn btn-outline-secondary" type="button" id="button-addon2" onClick={() => navigate("/AssignCreate", { state: { Email: Email,classid:classId} })} >+ New</button>
         </div>
         <div className="card-body" style={{ overflowY: 'scroll' }}>
           <div>
@@ -129,7 +129,7 @@ function Testernaja() {
               const lab = assignmentsData.Assignment[labNumber];
               const isLabExpanded = expandedLabs[labIndex];
               return (
-                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }} onClick={() => navigate("/AssignEdit", { state: { Email: Email,} })}>
+                <div key={labIndex} className='card ' style={{ marginBottom: '2rem' }} onClick={() => navigate("/AssignEdit", { state: { Email: Email,lab:labNumber,classid:classId} })}>
                   <button  style={{ fontSize: '1.2rem', height:'4rem'}} class="fw-bold ">
                     <span>{`Lab ${labIndex + 1}: ${lab.LabName}`}</span>
                     {Object.keys(lab.Section).length > 0 && (
@@ -153,4 +153,4 @@ function Testernaja() {
   )
 }
 
-export default Testernaja;
+export default AssignList;

@@ -22,6 +22,16 @@ def get_db():
         )
     return g.db
 
+""" def get_db():
+    if 'db' not in g:
+        g.db = pymysql.connect(
+            host='54.251.143.51',
+            user='root',
+            password='5T7H2t6J7PjIDEUMLNrc',
+            database='grader2',
+        )
+    return g.db """
+
 @app.before_request
 def before_request():
     g.db = get_db()
@@ -40,11 +50,13 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
     
 """ Global API + Function """
-def isCSV(filename):
+def isCSV(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv'
-def isIPYNB(filename):
+
+def isIPYNB(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
-def isPicture(filename):
+
+def isPicture(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
 def GetCSYID(dbCLS,cursor,ClassID,SchoolYear):
@@ -86,9 +98,20 @@ def AddUserGrader(dbAUG, cursor, UID, Email, Name):
         insert_user = "INSERT INTO user (Email, UID, Name) VALUES (%s, %s, %s)"
         cursor.execute(insert_user, (UID, Email, Name))
         dbAUG.commit()
+        return True
     except Exception as e:
         dbAUG.rollback()
-    
+        return False
+
+### Create Section in Class
+def CreateSection(dbCST, cursor, CSYID, Section):
+    try:
+        insert_section = "INSERT INTO section (CSYID, Section) VALUES (%s, %s)"
+        cursor.execute(insert_section, (CSYID, Section))
+        return True
+    except Exception as e:
+        dbCST.rollback()
+        return False
 ### Add a User in class
 def AddUserClass(dbAUC, cursor, UID, CSYID, Section):
     try:
@@ -96,33 +119,35 @@ def AddUserClass(dbAUC, cursor, UID, CSYID, Section):
         query_insertUSC = """INSERT INTO student (CID, UID) VALUES (%s, %s)"""
         cursor.execute(query_insertUSC, ( GetCID(dbAUC, cursor,Section,CSYID), UID))
         dbAUC.commit()    
+        return True
     except Exception as e:
         dbAUC.rollback()
-        print("An error occurred:", e)      
+        print("An error occurred:", e)   
+        return False   
     
 @app.route("/upload/CSV", methods=["POST"])
 def addstudentclass():
     
     CSYID = request.form.get("CSYID") 
     uploaded_CSV = request.files["file"]
-
+    filename = secure_filename(uploaded_CSV.filename)
+    filename = f"{CSYID}{os.path.splitext(uploaded_CSV.filename)[1]}"
+    filepath = os.path.join(UPLOAD_FOLDER,'CSV',filename)
     
     if not isCSV(uploaded_CSV.filename):
-        filename = secure_filename(uploaded_CSV.filename)
-        filename = f"{CSYID}{os.path.splitext(uploaded_CSV.filename)[1]}"
-        filepath = os.path.join(UPLOAD_FOLDER,'CSV',filename)
-        return jsonify({"message": "upload file must be .ipynb"}), 500 
+        return jsonify({"message": "upload file must be .CSV"}), 500 
 
     try:
         uploaded_CSV.save(filepath)
-    
         try:
-            dbAUG = get_db()
-            cursor = dbAUG.cursor()
+            conn = get_db()
+            cursor = conn.cursor()
             
             #clear student in class
-            delete_student_class=""" SELECT student FROM  student STD INNER JOIN section SCT ON STD.CID = SCT.CID WHERE CSYID = %s """
-            cursor.execute(delete_student_class, CSYID)
+            delete_student_class = """DELETE STD FROM student STD INNER JOIN section SCT ON STD.CID = SCT.CID WHERE SCT.CSYID = %s"""
+            cursor.execute(delete_student_class, (CSYID,))
+
+
             
             #read file and add user
             with open(filepath, newline='') as csvfile:
@@ -132,14 +157,17 @@ def addstudentclass():
                     print(row)
                     UID, Name, Section = row
                     Email = UID + "@student.chula.ac.th"
-                    AddUserGrader(dbAUG, cursor, Email, UID, Name)
-                    AddUserClass(dbAUG, cursor, UID, CSYID, Section)
-                    
+                    AddUserGrader(conn, cursor, Email, UID, Name)
+                    CreateSection(conn, cursor, CSYID, Section)
+                    AddUserClass(conn, cursor, UID, CSYID, Section)
+            conn.commit()
+            return jsonify({"message": "File uploaded successfully!"})
         except FileNotFoundError:
             print(f"File {filepath} not found.")
+            return jsonify({"message": "An error occurred while updating the file."}), 500
         except Exception as e:
             print("An error occurred:", e)
-        
+            return jsonify({"message": "An error occurred while updating the file."}), 500
         
     except Exception as e:
         print("Error saving file: {e}")
@@ -147,20 +175,23 @@ def addstudentclass():
  
 ###Upload Thumbnail
 @app.route("/upload/Thumbnail", methods=["POST"])
-def upload_Thumbnail(uploaded_file,CSYID):
+def upload_Thumbnail(uploaded_thumbnail,CSYID):
 
-    if uploaded_file and uploaded_file.filename != "":
-        filename = secure_filename(uploaded_file.filename)
-        filename = f"{CSYID}{os.path.splitext(uploaded_file.filename)[1]}"
+    CSYID = request.form.get("CSYID") 
+    uploaded_thumbnail = request.files["file"]
+    
+    if uploaded_thumbnail and uploaded_thumbnail.filename != "":
+        filename = secure_filename(uploaded_thumbnail.filename)
+        filename = f"{CSYID}{os.path.splitext(uploaded_thumbnail.filename)[1]}"
         filepath = os.path.join(UPLOAD_FOLDER,'Thumbnail',filename)        
         try:
-            uploaded_file.save(filepath)
+            uploaded_thumbnail.save(filepath)
             return True
         except Exception as e:
             print("Error saving file: {e}")
             return False
     return False
- 
+
 ### get classes by Email       
 @app.route('/ST/class/classes', methods=['GET'])
 def get_classesdata():
@@ -356,6 +387,7 @@ def TurnIn():
     
     if not isIPYNB(uploaded_file.filename):
         return jsonify({"message": "upload file must be .ipynb"}), 500 
+    
     if uploaded_file.filename != "":
         filename = secure_filename(uploaded_file.filename)        
         filename = f"{UID}-L{Lab}Q{Question}-{CSYID}{os.path.splitext(uploaded_file.filename)[1]}"
