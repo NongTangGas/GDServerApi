@@ -40,26 +40,12 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
     
 """ Global API + Function """
-###Is CSV
 def isCSV(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv'
-
 def isIPYNB(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
-
 def isPicture(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
-
-#### Add CET
-def AddClassEditor(dbACE,cursor,Email,CSYID):
-    try:
-        insert_user = "INSERT INTO classeditor (Email, CSYID) VALUES (%s, %s)"
-        cursor.execute(insert_user, (Email, CSYID))
-        dbACE.commit()
-        return True
-    except Exception as e:
-        dbACE.rollback()
-        return False
 
 def GetCSYID(dbCLS,cursor,ClassID,SchoolYear):
     try:
@@ -71,127 +57,93 @@ def GetCSYID(dbCLS,cursor,ClassID,SchoolYear):
     except Exception as e:
         dbCLS.rollback()
         return False
-        
-### Add a Student in grader
-def AddUserGrader(dbAUG, cursor, SID, Email, Name):
+    
+def GetCID(dbSec,cursor,section,CSYID):
     try:
-        insert_user = "INSERT INTO user (EmailName, Email, Name) VALUES (%s, %s, %s)"
-        cursor.execute(insert_user, (SID, Email, Name))
-        dbAUG.commit()
-        return True
+        query = """SELECT CID FROM section SCT WHERE SCT.Section = %s AND SCT.CSYID = %s """
+        cursor.execute(query,(section,CSYID))
+        # Fetch all rows
+        dbSec = cursor.fetchone()
+        return dbSec[0]
     except Exception as e:
-        dbAUG.rollback()
+        dbSec.rollback()
         return False
     
-### Add a User in class
-def AddUserClass(dbAUC, cursor, UserEmail, ClassID, SchoolYear, Section):
+#### Add CET
+def AddClassEditor(dbACE,cursor,Email,CSYID):
     try:
-        query_getclass = """
-            SELECT DISTINCT ID
-            FROM Class
-            WHERE ClassID = %s AND Section = %s AND SchoolYear = %s
-        """
-        cursor.execute(query_getclass, (ClassID, Section, SchoolYear))
-        id_class = cursor.fetchone()
-        
-        if id_class:
-            query_insertUSC = """
-                INSERT INTO userclass (Email, IDClass) VALUES (%s, %s)
-            """
-            cursor.execute(query_insertUSC, (UserEmail, id_class[0]))
-            dbAUC.commit()    
-            return True
-        else:
-            dbAUC.rollback()
-            return False
-
-
+        insert_user = "INSERT INTO classeditor (Email, CSYID) VALUES (%s, %s)"
+        cursor.execute(insert_user, (Email, CSYID))
+        dbACE.commit()
+        return True
+    except Exception as e:
+        dbACE.rollback()
+        return False
+    
+### Add a Student in grader
+def AddUserGrader(dbAUG, cursor, UID, Email, Name):
+    try:
+        insert_user = "INSERT INTO user (Email, UID, Name) VALUES (%s, %s, %s)"
+        cursor.execute(insert_user, (UID, Email, Name))
+        dbAUG.commit()
+    except Exception as e:
+        dbAUG.rollback()
+    
+### Add a User in class
+def AddUserClass(dbAUC, cursor, UID, CSYID, Section):
+    try:
+        #adduser
+        query_insertUSC = """INSERT INTO student (CID, UID) VALUES (%s, %s)"""
+        cursor.execute(query_insertUSC, ( GetCID(dbAUC, cursor,Section,CSYID), UID))
+        dbAUC.commit()    
     except Exception as e:
         dbAUC.rollback()
-        print("An error occurred:", e)
-        
-###Delete user in Class
-def DeleteUserClass(conn,cursor,Email,class_id,school_year):
-    try:
-        delete_query = """
-            DELETE SMT
-            FROM submitted SMT
-            INNER JOIN userclass USC on SMT.StudentID = LEFT(USC.Email, LOCATE('@', USC.Email) - 1)
-            WHERE SMT.StudentID = %s
-                AND SMT.ClassID = %s
-                AND SMT.SchoolYear = %s
-        """
-        cursor.execute(delete_query, (Email, class_id, school_year))
-        conn.commit()
-        return jsonify({"message": "Rows deleted successfully"}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500  
-
-### Delete User Summit
-def DeleteUserSummit(conn,cursor):
-    try:
-        conn = get_db()
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500  
-        
-
-###Upload CSV
+        print("An error occurred:", e)      
+    
 @app.route("/upload/CSV", methods=["POST"])
-def upload_CSV():
+def addstudentclass():
     
-    ClassID = request.form.get("ClassID")
-    SchoolYear = request.form.get("SchoolYear")
-    SYFile = SchoolYear.replace("/", "T")
-    uploaded_file = request.files["file"]
+    CSYID = request.form.get("CSYID") 
+    uploaded_CSV = request.files["file"]
 
-    if uploaded_file.filename != "":
-        filename = secure_filename(uploaded_file.filename)
-                    
-        filename = f"{ClassID}-{SYFile}{os.path.splitext(uploaded_file.filename)[1]}"
+    
+    if not isCSV(uploaded_CSV.filename):
+        filename = secure_filename(uploaded_CSV.filename)
+        filename = f"{CSYID}{os.path.splitext(uploaded_CSV.filename)[1]}"
         filepath = os.path.join(UPLOAD_FOLDER,'CSV',filename)
-        
-        try:
-            # Save the file
-            uploaded_file.save(filepath)
-            # Return a success message
-            UpdateStudentCSV(ClassID, SchoolYear)
-            return jsonify({"Status": True})
+        return jsonify({"message": "upload file must be .ipynb"}), 500 
 
-        except Exception as e:
-            # Handle any exceptions during file saving gracefully
-            print("Error saving file: {e}")
-            return jsonify({"Status": False}), 500
-    return jsonify({'Status': False}), 400
-
-### Read & Update CSV
-@app.route('/update/CSV', methods=['POST'])
-def UpdateStudentCSV(ClassID, SchoolYear):
-    ClassID = request.form.get('ClassID')
-    SchoolYear = request.form.get('SchoolYear')
-    
-    SYFile = SchoolYear.replace("/", "T")
-    filename = ClassID + "-" + SYFile + ".csv"
-    
-    file_path = os.path.join(UPLOAD_FOLDER,'CSV',filename)
     try:
-        dbAUG = get_db()
-        cursor = dbAUG.cursor()    
-        with open(file_path, newline='') as csvfile:
-            reader = csv.reader(csvfile)
-            # Skip the header row if it exists
-            next(reader, None)
-            for row in reader:
-                print(row)
-                SID, Name, Section = row
-                Email = SID + "@student.chula.ac.th"
-                AddUserGrader(dbAUG, cursor, SID, Email, Name)
-                AddUserClass(dbAUG, cursor, Email, ClassID, SchoolYear, Section)
-    except FileNotFoundError:
-        print(f"File {file_path} not found.")
+        uploaded_CSV.save(filepath)
+    
+        try:
+            dbAUG = get_db()
+            cursor = dbAUG.cursor()
+            
+            #clear student in class
+            delete_student_class=""" SELECT student FROM  student STD INNER JOIN section SCT ON STD.CID = SCT.CID WHERE CSYID = %s """
+            cursor.execute(delete_student_class, CSYID)
+            
+            #read file and add user
+            with open(filepath, newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader, None)
+                for row in reader:
+                    print(row)
+                    UID, Name, Section = row
+                    Email = UID + "@student.chula.ac.th"
+                    AddUserGrader(dbAUG, cursor, Email, UID, Name)
+                    AddUserClass(dbAUG, cursor, UID, CSYID, Section)
+                    
+        except FileNotFoundError:
+            print(f"File {filepath} not found.")
+        except Exception as e:
+            print("An error occurred:", e)
+        
+        
     except Exception as e:
-        print("An error occurred:", e)
+        print("Error saving file: {e}")
+        return jsonify({"message": "An error occurred while uploading the file."}), 500
  
 ###Upload Thumbnail
 @app.route("/upload/Thumbnail", methods=["POST"])
@@ -876,7 +828,57 @@ def TAclass_assignment():
         
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500
-            
+
+@app.route("/TA/class/Assign/Create", methods=["POST"])
+def TAclass_assignmentcreate():
+    try:
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        Creator = request.form.get('Creator')
+        LabNum = request.form.get('labNum')
+        LabName = request.form.get('labName')
+        CSYID = request.form.get('CSYID')
+        Question = request.form.get('Question')
+        submittedDates = request.form.get('submittedDates')
+        Create_time = datetime.now(gmt_timezone)
+
+
+        #create Lab first
+        select_lab_query = "SELECT * FROM lab WHERE Lab = %s AND CSYID = %s"
+        cursor.execute(select_lab_query, (LabNum, CSYID))
+        exist_lab = cursor.fetchone()
+
+        if exist_lab:
+            return jsonify({"message": "Lab already exists. Please select a different Lab number.","Status":1}), 500
+        else:
+            insert_lab_query = "INSERT INTO question (Lab, Name, CSYID) VALUES (%s, %s, %s)"
+            cursor.execute(insert_lab_query, (LabNum, LabName, CSYID))
+
+        #create Question
+        for id, data in Question.items():
+            score = data['score']
+            # Insert question data into the database
+            insert_question_query = "INSERT INTO your_table_name (Creator, Lab, Question, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s)"
+            cursor.execute(insert_question_query, (Creator, LabNum, id, score, Create_time, CSYID))
+
+        #assign to section
+        for section, dates in submittedDates.items():
+            Publish = dates['publishDate']
+            Due = dates['dueDate']
+            CID = GetCID(conn,cursor,section,CSYID)
+            insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
+            cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
+
+        conn.commit()
+    
+        return jsonify({"message":"create success","Status":2}), 500
+        
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"error": f"An error occurred: {error}","Status":3}), 500
+                
 @app.route("/TA/class/score", methods=["GET"])
 def TAclass_score():
     try:

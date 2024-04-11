@@ -50,11 +50,21 @@ function ClassEdit() {
     }
   
     const [timestamps, setTimestamps] = useState(Array(2).fill('')); // กำหนดขนาดของอาร์เรย์ตามจำนวนที่ต้องการใช้งาน (ในที่นี้คือ 2)
+
     const handleUpload = (index) => {
       // Get the current date and time
       const now = new Date();
       const formattedTimestamp = now.toLocaleString();
   
+
+      /* Thumbnail */
+      if(index == 0){
+
+      }
+      /* CSV */
+      if(index == 1){
+
+      }
       // Update the timestamp state
       setTimestamps(prevTimestamps => {
         const newTimestamps = [...prevTimestamps];

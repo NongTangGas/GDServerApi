@@ -10,7 +10,7 @@ function AssignCreate() {
   const [dueDate, setDueDate] = useState('');
   const [totalQNum, setTotalQNum] = useState('');
   const [sections, setSections] = useState([1, 2, 3, 4, 5]); //ใส่ sec ที่จะเอา
-  const [scores, setScores] = useState([]);
+  const [Question, setScores] = useState([]);
   const [submittedData, setSubmittedData] = useState(null);
   const [checkedSections, setCheckedSections] = useState([]);
   const currentDate = new Date().toISOString().slice(0, 16);
@@ -80,7 +80,7 @@ function AssignCreate() {
   };
 
   const handleScoreChange = (id, score) => {
-    const updatedScores = scores.map((item) =>
+    const updatedScores = Question.map((item) =>
       item.id === id ? { ...item, score } : item
     );
     setScores(updatedScores);
@@ -108,7 +108,7 @@ function AssignCreate() {
         labNum,
         labName,
         sections,
-        scores,
+        Question: Question,
         submittedDates // ส่งข้อมูลที่เกี่ยวข้องกับแต่ละ section
       };
       setSubmittedData(data);
@@ -175,7 +175,7 @@ function AssignCreate() {
               <input type="number" min="1" className="form-control" id="inputQnum" onChange={handleTotalQNumChange} />
             </div>
 
-            {scores.map((scoreItem) => (
+            {Question.map((scoreItem) => (
               <div key={scoreItem.id} className="col-md-2">
                 <label htmlFor={`inputScore${scoreItem.id}`} className="form-label">
                   Score Q.{scoreItem.id}
