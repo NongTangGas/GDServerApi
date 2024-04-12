@@ -174,7 +174,7 @@ function AssignEdit() {
     if (isFormValid()) {
       try {
         
-        const response = await fetch('http://127.0.0.1:5000/TA/class/Assign/Create', {
+        const response = await fetch('http://127.0.0.1:5000/TA/class/Assign/Edit', {
               method: 'POST',
               body: formData,
         })
@@ -223,8 +223,15 @@ function AssignEdit() {
       <br />
       <div className="card" style={{ marginLeft: '10em', marginRight: '10em' }}>
         <div className="card-header">
-          <h5>Create assignment</h5>
-        </div>
+                <ul className="nav nav-tabs card-header-tabs">
+                    <li className="nav-item">
+                        <button className="nav-link active">Edit</button>
+                    </li>
+                    <li className="nav-item">
+                        <button className="nav-link link" onClick={() => navigate("/Sentin", { state: { Email: Email,classid:classId,lab:oldlab,labname:oldlabname} })} >Sent in</button>
+                    </li>
+                </ul>
+            </div>
         <div className="card-body">
           <form className="row g-3">
             <div className="col-md-6">

@@ -14,6 +14,7 @@ function AssignList() {
   const classData = location.state;
   const Email = classData.Email;
   const classId = classData.classid;
+  
   console.log(classData)
 
   const [userData, setUserData] = useState(null);

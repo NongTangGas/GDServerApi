@@ -304,7 +304,7 @@ def upload_Thumbnail(uploaded_thumbnail,CSYID):
     
     if uploaded_thumbnail and uploaded_thumbnail.filename != "":
         filename = secure_filename(uploaded_thumbnail.filename)
-        filename = f"{CSYID}{os.path.splitext(uploaded_thumbnail.filename)[1]}"
+        filename = f"{CSYID}-{filename}"
         filepath = os.path.join(UPLOAD_FOLDER,'Thumbnail',filename)        
         try:
             uploaded_thumbnail.save(filepath)
@@ -1103,7 +1103,6 @@ def TAclass_score():
         cursor = g.db.cursor()
         
         CSYID = request.args.get('CSYID')
-        Section = request.args.get('Section')
         Lab = request.args.get('Lab')
                 
         query = """ 
@@ -1118,7 +1117,9 @@ def TAclass_score():
                 QST.MaxScore,
                 SMT.Score,
                 CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
-                CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
+                CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late,
+                SCT.section,
+                SMT.LastEdit
             FROM
                 question QST
                 INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab 
@@ -1129,21 +1130,20 @@ def TAclass_score():
                 INNER JOIN user USR ON USR.UID = STD.UID
             WHERE
                 QST.CSYID = %s
-                AND SCT.Section = %s
                 AND LB.Lab = %s
             """ 
-        cursor.execute(query, (CSYID , Section, Lab))
+        cursor.execute(query, (CSYID, Lab))
         
         data = cursor.fetchall()
         transformed_data = {}
 
         for entry in data:
-            uid, name, lab, question, lab_name, due, timestamp, max_score, score, turn_in, late = entry
+            uid, name, lab, question, lab_name, due, timestamp, max_score, score, turn_in, late, section, last_edit = entry
             if lab not in transformed_data:
                 transformed_data[lab] = {'LabName': lab_name, 'Due': due, 'Questions': {}}
             if question not in transformed_data[lab]['Questions']:
                 transformed_data[lab]['Questions'][question] = {'MaxScore': max_score, 'Scores': {}}
-            transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Name':name,'Score': score, 'Timestamp': timestamp,'Late':bool(late)}
+            transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Name':name,'Score': score, 'Timestamp': timestamp,'Late':bool(late),'Section':section,'LastEdit':last_edit}
 
 
         return jsonify(transformed_data[Lab])
@@ -1151,6 +1151,35 @@ def TAclass_score():
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500
     
+    
+@app.route("/TA/class/SentEdit", methods=["POST"])
+def sentEdit():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        data = json.loads(request.form.get('Data'))
+        
+        UID = data['UID']
+        Lab = data['Lab']
+        Question = data['Question']
+        score = data['updatescore']
+        CSYID = data['CSYID']
+        update_score_time = datetime.now(gmt_timezone)
+        
+        print(UID,Lab,Question,score,CSYID)
+        
+        sentin_edit_query = """ 
+        INSERT INTO Submitted (UID, Lab, Question, score, CSYID, LastEdit)
+        VALUES (%s, %s, %s, %s, %s, %s) AS new
+        ON DUPLICATE KEY UPDATE score = new.score, LastEdit = new.LastEdit
+        """
+        cursor.execute(sentin_edit_query,(UID, Lab, Question, score, CSYID, update_score_time))
+        conn.commit()
+        return jsonify({"message":"update score successful"}), 500
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"error": f"An error occurred: {error}"}), 500
 @app.route("/TA/Student/List", methods=["GET"])
 def StudentList():
     
@@ -1269,81 +1298,6 @@ def CSVList():
 
     # Return the content of the final output stream as a Flask response
     return Response(output.getvalue(), headers=headers)
-
-
-
-
-@app.route("/TA/Student/LabList", methods=["GET"])
-def LabStudentList():
-    #ลืม section
-    #Param
-    class_id = request.args.get('class_id')
-    school_year = request.args.get('school_year')
-    
-    # Create a cursor
-    cur = g.db.cursor()
-    query = """
-        SELECT
-        	QST.LAB,
-            QST.Question,
-            USR.EmailName,
-            CLS.Section,
-            USR.Name,
-            SMT.TimeStamp,
-            SMT.Score,
-            QST.MaxScore,
-            ASN.DueTime,
-            CASE WHEN SMT.TimeStamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
-            CASE WHEN ASN.DueTime <= SMT.TimeStamp THEN TRUE ELSE FALSE END AS Late
-        FROM
-        	Question QST
-            INNER JOIN class CLS 
-            INNER JOIN userclass USC ON CLS.ID = USC.IDClass 
-            INNER JOIN submitted SMT ON QST.LAB = SMT.LAB AND QST.Question = SMT.Question
-            INNER JOIN assign ASN ON QST.LAB = ASN.LAB
-            INNER JOIN user USR ON USC.Email = USR.Email
-        WHERE
-            QST.ClassID = %s
-            AND QST.SchoolYear = %s
-            AND QST.ClassID = ASN.ClassID AND ASN.ClassID = SMT.ClassID AND SMT.ClassID = CLS.ClassID
-        	AND QST.SchoolYear = ASN.SchoolYear AND ASN.SchoolYear = SMT.SchoolYear AND SMT.SchoolYear = CLS.SchoolYear
-            AND LEFT(USC.Email, LOCATE('@', USC.Email) - 1) = SMT.StudentID
-        ORDER BY
-        	USR.EmailName ASC,QST.LAB ASC, QST.Question ASC;
-                """
-    # Execute a SELECT statement
-    cur.execute(query,(class_id,school_year))
-    # Fetch all rows
-    data = cur.fetchall()
-    transformed_data = {}
-    for row in data:
-        lab, question, emailname, section, name, timestamp, score, maxscore, duetime, turn_in, late = row
-        # Convert turn_in and late to boolean values
-        turn_in_bool = bool(turn_in)
-        late_bool = bool(late)
-        # Create LAB if it doesn't exist
-        if emailname not in transformed_data:
-            transformed_data[emailname] = {"EmailName": emailname, "Name": name, "Section":section}
-        # Create LAB dictionary if it doesn't exist
-        if f'LAB{lab}' not in transformed_data[emailname]:
-            transformed_data[emailname][f'LAB{lab}'] = {}
-        # Add question data to LAB dictionary
-        transformed_data[emailname][f'LAB{lab}'][f'Q{question}'] = {
-            'DueTime': duetime,
-            'Score': score,
-            'Maxscore': maxscore,
-            'TimeStamp': timestamp,
-            'Late': late_bool,
-            'TurnIn': turn_in_bool
-        }
-    # Convert the dictionary to a list of values
-    transformed_data_list = list(transformed_data.values())
-        
-    # Close the cursor
-    cur.close()
-    # Convert the result to the desired structure
-    return jsonify(transformed_data_list)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
