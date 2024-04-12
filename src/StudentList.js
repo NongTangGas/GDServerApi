@@ -91,11 +91,13 @@ function StudentList() {
       <Navbarprof />
       <br />
       <div className="media d-flex align-items-center">
-        {/* Icon and class details */}
+        <span style={{ margin: '0 10px' }}></span>
+        <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} />
+        <span style={{ margin: '0 10px' }}></span>
         <div className="card" style={{ width: '30rem', padding: '10px' }}>
-          <h5>Class details</h5>
-          <h6>Instructor: {userData ? userData.Name : 'Loading...'}</h6>
-        </div>
+          <h5>210xxx comp prog 2566/2 sec1</h5>
+          <h6>Instructor: Name Surname</h6>
+      </div>
         <button type="button" className="btn btn-secondary" style={{ marginLeft: '40em' }} onClick={handleExport}>Export</button>
       </div>
       <br />

@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, g, Response
+from flask import Flask, jsonify, request, g, Response, send_file
 from flask_cors import CORS
 import pymysql
 from werkzeug.utils import secure_filename
@@ -94,10 +94,24 @@ def GetCID(dbSec,cursor,section,CSYID):
     except Exception as e:
         dbSec.rollback()
         return False
+
+### get picture
+@app.route("/image/<filename>", methods=["GET"])
+def get_image(filename):
+    image_extensions = {'png', 'jpg', 'jpeg', 'gif'}
+    file_extension = filename.split('.')[-1]
     
+    # Check if the file extension is in the set of allowed image extensions
+    if file_extension.lower() in image_extensions:
+        return send_file(os.path.join(UPLOAD_FOLDER, 'Thumbnail', filename), mimetype=f"image/{file_extension}")
+    else:
+        return "Invalid image file format", 400  # Return a 400 Bad Request status for invalid image formats
+
+
 #### Add CET
 def AddClassEditor(dbACE,cursor,Email,CSYID):
     try:
+        
         insert_user = "INSERT INTO classeditor (Email, CSYID) VALUES (%s, %s)"
         cursor.execute(insert_user, (Email, CSYID))
         dbACE.commit()
@@ -110,7 +124,7 @@ def AddClassEditor(dbACE,cursor,Email,CSYID):
 def AddUserGrader(dbAUG, cursor, UID, Email, Name):
     try:
         insert_user = "INSERT INTO user (Email, UID, Name) VALUES (%s, %s, %s)"
-        cursor.execute(insert_user, (UID, Email, Name))
+        cursor.execute(insert_user, (Email, UID, Name))
         dbAUG.commit()
         return True
     except Exception as e:
@@ -277,7 +291,7 @@ def addstudentclass():
                     AddUserGrader(conn, cursor, Email, UID, Name)
                     CreateSection(conn, cursor, CSYID, Section)
                     AddUserClass(conn, cursor, UID, CSYID, Section)
-                    if(maxSection < Section):maxSection=Section
+                    if(maxSection < int(Section)):maxSection = int(Section)
                 #clear unused section
                 delete_student_class = """DELETE SCT FROM section SCT WHERE SCT.CSYID = %s AND SCT.Section > %s"""
                 cursor.execute(delete_student_class, (CSYID,maxSection))
@@ -297,22 +311,35 @@ def addstudentclass():
  
 ###Upload Thumbnail
 @app.route("/upload/Thumbnail", methods=["POST"])
-def upload_Thumbnail(uploaded_thumbnail,CSYID):
-
+def upload_Thumbnail():
+    conn = get_db()
+    cursor = conn.cursor()
+    
     CSYID = request.form.get("CSYID") 
     uploaded_thumbnail = request.files["file"]
     
     if uploaded_thumbnail and uploaded_thumbnail.filename != "":
         filename = secure_filename(uploaded_thumbnail.filename)
-        filename = f"{CSYID}-{filename}"
-        filepath = os.path.join(UPLOAD_FOLDER,'Thumbnail',filename)        
+        filename = f"{CSYID}{os.path.splitext(uploaded_thumbnail.filename)[1]}"
+        
+        filepath = os.path.join(UPLOAD_FOLDER, 'Thumbnail', filename)        
         try:
+            update_thumbnail = """ 
+                UPDATE class
+                SET Thumbnail = %s
+                WHERE CSYID = %s
+                """
+            cursor.execute(update_thumbnail, (filename, CSYID))
+            conn.commit()
             uploaded_thumbnail.save(filepath)
-            return True
+
+            return jsonify({"success": True})
         except Exception as e:
-            print("Error saving file: {e}")
-            return False
-    return False
+            print(f"Error saving file: {e}")
+            return jsonify({"success": False, "error": str(e)})
+    
+    return jsonify({"success": False, "error": "No file provided"})
+
 
 ### get classes by Email       
 @app.route('/ST/class/classes', methods=['GET'])
@@ -1011,8 +1038,6 @@ def TAclass_assignmentedit():
         Create_time = datetime.now(gmt_timezone) #no change
         
         oldLabNum = request.form.get('oldlabNum')
-        oldQuestion = json.loads(request.form.get('oldQuestion'))
-        oldsubmittedDates = json.loads(request.form.get('oldsubmittedDates'))
         
         
         LabNum = request.form.get('labNum')
@@ -1020,77 +1045,70 @@ def TAclass_assignmentedit():
         Question = json.loads(request.form.get('Question'))
         submittedDates = json.loads(request.form.get('submittedDates'))
         
-        
 
         #check lab exist
         select_lab_query = "SELECT Lab,Name,CSYID FROM lab WHERE Lab = %s AND CSYID = %s"
         cursor.execute(select_lab_query, (LabNum, CSYID))
         exist_lab = cursor.fetchone()
-
-        if exist_lab:
-            return jsonify({"message": "Lab already exists. Please select a different Lab number.","Status":1}), 500
-        else:
-            
-            #update lab
-            update_lab_query = """ UPDATE lab SET Lab = %s,Name = %s WHERE Lab = %s AND CSYID = %s """
-            
-            cursor.execute(update_lab_query, (LabNum, LabName, oldLabNum, CSYID))
-
-            
-            #update Question
-            try:
-                for question_data in Question:
-                    question_id = question_data['id']
-                    score = question_data['score']
-                    # Insert question data into the database
-                    insert_question_query = """ 
-                        INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID)
-                        VALUES (%s, %s, %s, %s, %s, %s) AS new
-                        ON DUPLICATE KEY UPDATE MaxScore = new.MaxScore,LastEdit = new.LastEdit
-                    """
-                    cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
-                    maxQuestion = question_id
-            
-            except mysql.connector.Error as error:
-                conn.rollback()
-                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
-
-            #delete unuse Question
-            try:
-                delete_question_query = """ 
-                        DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question > %s
-                    """
-                cursor.execute(delete_question_query, (LabNum, CSYID, maxQuestion))
-                    
-            except mysql.connector.Error as error:
-                    conn.rollback()
-                    return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
-
-            #delete old assign
-            try:
-                delete_assign_query = """ 
-                        DELETE ASN FROM assign ASN WHERE ASN.Lab = %s AND ASN.CSYID = %s
-                    """
-                cursor.execute(delete_assign_query, (LabNum, CSYID))
+        print(exist_lab)
+        
+        #update lab
+        print("askdcpoaskcdpasokdcpoasdkcpasdokcpasdokcasdodckdaspodck")
+        update_lab_query = """ UPDATE lab SET Lab = %s,Name = %s WHERE Lab = %s AND CSYID = %s """
+        
+        cursor.execute(update_lab_query, (LabNum, LabName, oldLabNum, CSYID))
+        print("askdcpoaskcdpasokdcpoasdkcpasdokcpasdokcasdodckdaspodck")
+        #update Question
+        try:
+            for question_data in Question:
+                question_id = question_data['id']
+                score = question_data['score']
+                # Insert question data into the database
+                insert_question_query = """ 
+                    INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID)
+                    VALUES (%s, %s, %s, %s, %s, %s) AS new
+                    ON DUPLICATE KEY UPDATE MaxScore = new.MaxScore,LastEdit = new.LastEdit
+                """
+                cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
+                maxQuestion = question_id
+        
+        except mysql.connector.Error as error:
+            conn.rollback()
+            return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+        #delete unuse Question
+        try:
+            delete_question_query = """ 
+                    DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question > %s
+                """
+            cursor.execute(delete_question_query, (LabNum, CSYID, maxQuestion))
                 
-            except mysql.connector.Error as error:
+        except mysql.connector.Error as error:
                 conn.rollback()
                 return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+        #delete old assign
+        try:
+            delete_assign_query = """ 
+                    DELETE ASN FROM assign ASN WHERE ASN.Lab = %s AND ASN.CSYID = %s
+                """
+            cursor.execute(delete_assign_query, (LabNum, CSYID))
             
-            #assign to section
-            try:
-                for section, dates in submittedDates.items():
-                    Publish = dates['publishDate']
-                    Due = dates['dueDate']
-                    CID = GetCID(conn,cursor,section,CSYID)
-                    insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
-                    cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
-            except mysql.connector.Error as error:
-                conn.rollback()
-                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
-
-            conn.commit()
-            return jsonify({"message":"create success","Status":True}), 500
+        except mysql.connector.Error as error:
+            conn.rollback()
+            return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+        
+        #assign to section
+        try:
+            for section, dates in submittedDates.items():
+                Publish = dates['publishDate']
+                Due = dates['dueDate']
+                CID = GetCID(conn,cursor,section,CSYID)
+                insert_assignTo = """ INSERT INTO assign (Lab,Publish,Due,CID,CSYID) VALUES(%s,%s,%s,%s,%s) """
+                cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
+        except mysql.connector.Error as error:
+            conn.rollback()
+            return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+        conn.commit()
+        return jsonify({"message":"create success","Status":True}), 500
         
     except mysql.connector.Error as error:
         conn.rollback()

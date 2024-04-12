@@ -12,8 +12,6 @@ function AssignEdit() {
   const classId = classData.classid;
   const oldlab = classData.lab;
   const oldlabname = classData.labname;
-  const [lab, setLab] = useState(null);
-
 
   const [showAlert, setShowAlert] = useState(false);
 
@@ -29,36 +27,37 @@ function AssignEdit() {
   const currentDate = new Date().toISOString().slice(0, 16);
   const [submittedDates, setSubmittedDates] = useState({});
   const [isLoading, setIsLoading] = useState(true); // Add isLoading state
+  const [inputQnum, setInputQnum] = useState('');
 
+  const fetchLab = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/TA/class/Assign/data?CSYID=${classId}&labnumber=${oldlab}`);
+      const data = await response.json();
+      console.log('sections:', data);
+      setTotalQNum(data.Question.length);
+      setScores(data.Question)
+      setCheckedSections(data.section)
+      setSubmittedDates(data.LabTime)
+      console.log(submittedDates)
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
 
+  const fetchSection = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/section?CSYID=${classId}`);
+      const data = await response.json();
+      console.log('sections:', data);
+      setSections(data);
+      
+
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
   useEffect(() => {
-    const fetchLab = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/TA/class/Assign/data?CSYID=${classId}&labnumber=${oldlab}`);
-        const data = await response.json();
-        console.log('sections:', data);
-        setTotalQNum(data.Question.length);
-        setScores(data.Question)
-        setCheckedSections(data.section)
-        setSubmittedDates(data.LabTime)
-        console.log(submittedDates)
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    };
-
-    const fetchSection = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/section?CSYID=${classId}`);
-        const data = await response.json();
-        console.log('sections:', data);
-        setSections(data);
-        
-
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    };
+    
 
     fetchLab()
     fetchSection()
@@ -85,7 +84,7 @@ function AssignEdit() {
     
 
     setIsLoading(false)
-  }, [totalQNum]);
+  }, []);
 
   const handlePublishDateChange = (e, section) => {
     const selectedPublishDate = new Date(e.target.value);
@@ -129,15 +128,21 @@ function AssignEdit() {
   };
 
   const handleTotalQNumChange = (e) => {
-    const numQuestions = parseInt(e.target.value, 10);
+    let numQuestions = parseInt(e.target.value);
+    if (isNaN(numQuestions) || numQuestions < 1 || numQuestions === null) {
+        numQuestions = 1;
+    } else if (numQuestions > 20) {
+        numQuestions = 20;
+    }
     setTotalQNum(numQuestions);
 
     const newScores = Array.from({ length: numQuestions }, (_, index) => ({
-      id: index + 1,
-      score: 1,
+        id: index + 1,
+        score: 1,
     }));
     setScores(newScores);
-  };
+};
+
   
 
   const handleScoreChange = (id, score) => {
@@ -165,6 +170,7 @@ function AssignEdit() {
   
   const handleButtonClick = async () => {
     const formData = new FormData();
+    formData.append('oldlabNum', oldlab);
     formData.append('Creator', Email);
     formData.append('labNum', labNum);
     formData.append('labName', labName);
@@ -236,11 +242,11 @@ function AssignEdit() {
           <form className="row g-3">
             <div className="col-md-6">
               <label htmlFor="LabNum" className="form-label">Lab Number*</label>
-              <input type="number" min="1" className="form-control" id="LabNum" value={oldlab} onChange={(e) => setLabNum(e.target.value)} />
+              <input type="number" min="1" className="form-control" id="LabNum" value={labNum} onChange={(e) => setLabNum(e.target.value)} />
             </div>
             <div className="col-md-6">
               <label htmlFor="LabName" className="form-label">Lab Name*</label>
-              <input type="name" className="form-control" id="LabName" value={oldlabname} onChange={(e) => setLabName(e.target.value)} />
+              <input type="name" className="form-control" id="LabName" value={labName} onChange={(e) => setLabName(e.target.value)} />
             </div>
 
             <div className="col-6">
@@ -249,7 +255,7 @@ function AssignEdit() {
             </div>
             <div className="col-md-6">
               <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>
-              <input type="number" min="1" className="form-control" id="inputQnum" value={totalQNum} onChange={handleTotalQNumChange} />
+              <input type="number" min="1" className="form-control" id="inputQnum" value={totalQNum} onChange={(e) => {handleTotalQNumChange(e)}} />
             </div>
 
             {Question.map((scoreItem) => (

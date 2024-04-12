@@ -126,11 +126,6 @@ function Sentin({ Q = 2 }) {
 
         const sendFormData = async () => {
           const formData = new FormData();
-          /* formData.append('UID', selectedStudentId);
-          formData.append('Lab', oldlab);
-          formData.append('Question', selectedCell);
-          formData.append('updatescore', newScores[`Q${selectedCell}`][selectedStudentId]);
-          formData.append('CSYID', classId); */
           formData.append('Data',JSON.stringify({
             UID: selectedStudentId,
             Lab: oldlab,

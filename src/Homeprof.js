@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbarprof from './Navbarprof'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 function Homeprof() {
   const navigate = useNavigate();
@@ -21,7 +22,9 @@ function Homeprof() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [isdelete, setdelete] = useState(false);
   
+ 
 
+  
 
   const handleChange = (e) => {
     setFormData({
@@ -61,6 +64,32 @@ function Homeprof() {
     }
   };
   
+  const filename = String(courses)+".jpg"; // or any other filename you want to fetch dynamically
+
+  fetch(`/image/${filename}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.blob();
+    })
+    .then(blob => {
+      // Create a temporary URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create an image element and set its source to the URL
+      const img = document.createElement("img");
+      img.src = url;
+      
+      // Append the image to the document body or any other container
+      document.body.appendChild(img);
+      
+      // Clean up by revoking the object URL
+      URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+      console.error("Error fetching image:", error);
+    });
 
   useEffect(() => {
     try{if(location.state.delete)setdelete(true)}catch{setdelete(false)}
@@ -110,10 +139,8 @@ function Homeprof() {
     e.preventDefault();
     console.log('Form Data:', formData);
     try {
-      const response = await fetch('http://127.0.0.1:5000/TA/class/create', {
-            method: 'POST',
-            body: formData,
-      })
+      
+      const response = await axios.post('http://127.0.0.1:5000/TA/class/create', formData)
       console.log(response)
       if (response.data.Status) {
         fetchCourses();
@@ -130,7 +157,7 @@ function Homeprof() {
       <Navbarprof />
       {isdelete && deleteAlert ? (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
-                    Class created successfully
+                    Class delete successfully
                     <button type="button" className="btn-close align-items-right" aria-label="Close" onClick={handleDeleteClose}></button>
                   </div>
                 ):(null)}

@@ -82,27 +82,28 @@ function ClassEdit() {
         
       }
       /* CSV */
-      if(index == 1){
+      if (index === 1) {
         const fileInput = document.getElementById('inputGroupFile02');
         const fileCSV = fileInput.files[0];
-
+    
         const formData = new FormData();
         formData.append('CSYID', CSYID)
-        formData.append('file',fileCSV)
-
+        formData.append('file', fileCSV)
         try {
             const response = await fetch('http://127.0.0.1:5000/upload/CSV', {
                 method: 'POST',
                 body: formData,
-          });
+            });
             const responseData = await response.json();
             console.log(responseData);
-            if (responseData.Status)
+            if (responseData.Status) {
                 setShowAlert(true);
+            }
         } catch (error) {
             console.error('Error submitting data:', error);
         }
-      }
+    }
+    
 
       if(response){
         setTimestamps(prevTimestamps => {
