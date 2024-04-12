@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, g, Response, send_file
+from flask import Flask, jsonify, request, g, Response, send_file, send_from_directory
 from flask_cors import CORS
 import pymysql
 from werkzeug.utils import secure_filename
@@ -9,6 +9,7 @@ from datetime import datetime
 import pytz
 import json
 from io import StringIO
+from config import UPLOAD_FOLDER
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
@@ -45,11 +46,6 @@ def teardown_request(exception=None):
         db.close()
 
 gmt_timezone = pytz.timezone('GMT')
-
-########UPLOAD_FOLDER
-UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
     
 """ Global API + Function """
 def isCSV(filename): 
@@ -58,9 +54,14 @@ def isCSV(filename):
 def isIPYNB(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'ipynb'
 
-#*******picture check and delete old picture ด้วย
 def isPicture(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
+@app.route('/Thumbnail/<filename>')
+def get_image_thumbnail(filename):
+    filepath = os.path.join(UPLOAD_FOLDER, 'Thumbnail', filename)
+    return send_from_directory(os.path.dirname(filepath), os.path.basename(filepath))
+
 
 def GetClassSchoolyear(dbCLS,cursor,CSYID):
     try:
@@ -288,9 +289,12 @@ def addstudentclass():
                     print(row)
                     UID, Name, Section = row
                     Email = UID + "@student.chula.ac.th"
-                    AddUserGrader(conn, cursor, Email, UID, Name)
+                    AddUserGrader(conn, cursor, UID, Email, Name)
+                    print('AUG<<<<<<<<<<<<<<<<<<<<<<<<')
                     CreateSection(conn, cursor, CSYID, Section)
+                    print('CST<<<<<<<<<<<<<<<<<<<<<<<<')
                     AddUserClass(conn, cursor, UID, CSYID, Section)
+                    print('AUC<<<<<<<<<<<<<<<<<<<<<<<<')
                     if(maxSection < int(Section)):maxSection = int(Section)
                 #clear unused section
                 delete_student_class = """DELETE SCT FROM section SCT WHERE SCT.CSYID = %s AND SCT.Section > %s"""
@@ -1018,7 +1022,7 @@ def TAclass_assignmentdelete():
 
         #just delete lab
         
-        delete_lab_query = "DELETE LB FROM lab LB WHERE LB.Lab = %s AND LB.CSYID = %s"
+        delete_lab_query = "DELETE FROM lab WHERE LB.Lab = %s AND LB.CSYID = %s"
         cursor.execute(delete_lab_query, (LabNum, CSYID))        
         conn.commit()
         return jsonify({"message":"delete success","Status":True}), 500
@@ -1198,8 +1202,40 @@ def sentEdit():
     except mysql.connector.Error as error:
         conn.rollback()
         return jsonify({"error": f"An error occurred: {error}"}), 500
+    
 @app.route("/TA/Student/List", methods=["GET"])
 def StudentList():
+    
+    CSYID = request.args.get('CSYID')
+    cur = g.db.cursor()
+    StudentList_query = """ 
+        SELECT
+            STD.UID,
+            USR.Name,
+            SCT.Section
+        FROM
+            class CLS
+            INNER JOIN section SCT ON CLS.CSYID = SCT.CSYID
+            INNER JOIN student STD ON SCT.CID = STD.CID
+            INNER JOIN user USR ON STD.UID = USR.UID
+        WHERE
+            CLS.CSYID = %s
+        ORDER BY
+            Section ASC,UID ASC
+    """
+    cur.execute(StudentList_query,(CSYID))
+    ListResult = cur.fetchall()
+    
+    transformed_data = []
+
+    for row in ListResult:
+        UID , Name, Section = row
+        transformed_data.append({'UID': UID, 'Name': Name, 'Section': Section})
+
+    return jsonify(transformed_data)   
+    
+@app.route("/TA/Student/List/score", methods=["GET"])
+def StudentListScore():
     
     CSYID = request.args.get('CSYID')
     cur = g.db.cursor()

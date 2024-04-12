@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
+
 function Homeprof() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,7 +23,7 @@ function Homeprof() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [isdelete, setdelete] = useState(false);
   
- 
+  const filename = "21.jpg"; // or any other filename you want to fetch dynamically
 
   
 
@@ -64,32 +65,7 @@ function Homeprof() {
     }
   };
   
-  const filename = String(courses)+".jpg"; // or any other filename you want to fetch dynamically
-
-  fetch(`/image/${filename}`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-      return response.blob();
-    })
-    .then(blob => {
-      // Create a temporary URL for the blob
-      const url = URL.createObjectURL(blob);
-      
-      // Create an image element and set its source to the URL
-      const img = document.createElement("img");
-      img.src = url;
-      
-      // Append the image to the document body or any other container
-      document.body.appendChild(img);
-      
-      // Clean up by revoking the object URL
-      URL.revokeObjectURL(url);
-    })
-    .catch(error => {
-      console.error("Error fetching image:", error);
-    });
+  
 
   useEffect(() => {
     try{if(location.state.delete)setdelete(true)}catch{setdelete(false)}
@@ -223,7 +199,8 @@ function Homeprof() {
                     {classes.map(course => (
                       <div key={course.ID} className="col">
                         <div className="card h-100" style={{width: '15rem'}}><div>
-                          <img src={course.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
+                          <img src={course.Thumbnail ? "/Thumbnail/" + course.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
+
                           </div>
                           <div className="card-body" style={{ overflowY: 'scroll' }}>
                             <h5 className="card-title">{course.ClassName}</h5>

@@ -33,28 +33,6 @@ function AssignList() {
             "Publish": "Tue, 28 Nov 2023 14:45:00 GMT"
           }
         }
-      },
-      "2": {
-        "LabName": "Hojicha",
-        "Section": {
-          "1": {
-            "Due": "Thu, 28 Dec 2023 14:45:00 GMT",
-            "Publish": "Sat, 18 Nov 2023 14:45:00 GMT"
-          },
-          "2": {
-            "Due": "Tue, 20 Feb 2024 14:45:00 GMT",
-            "Publish": "Thu, 28 Dec 2023 14:45:00 GMT"
-          }
-        }
-      },
-      "3": {
-        "LabName": "Matcha",
-        "Section": {
-          "1": {
-            "Due": "Sat, 27 Dec 2025 14:45:00 GMT",
-            "Publish": "Sat, 20 Dec 2025 14:45:00 GMT"
-          }
-        }
       }
     }
   });

@@ -14,6 +14,9 @@ function AssignEdit() {
   const oldlabname = classData.labname;
 
   const [showAlert, setShowAlert] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+
 
   const [labNum, setLabNum] = useState('');
   const [labName, setLabName] = useState('');
@@ -86,6 +89,32 @@ function AssignEdit() {
     setIsLoading(false)
   }, []);
 
+  const handleShowModal = () => {
+    setShowModal(true);
+  };
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  const handleDelete = async () =>{
+    const formData = new FormData();
+    formData.append('CSYID',classId)
+    formData.append('oldlabNum',oldlab)
+    try {
+      const response = await fetch('http://127.0.0.1:5000/TA/class/delete', {
+        method: 'POST',
+        body: formData,
+      });
+        const responseData = await response.json();
+        console.log(responseData);
+        if (responseData.Status)
+          navigate("/AssignList", { state: { Email: Email,classid: classId,delete:true} })
+    } catch (error) {
+      console.error('Error delete class:', error);
+    }
+  }
+
+  
   const handlePublishDateChange = (e, section) => {
     const selectedPublishDate = new Date(e.target.value);
     const formattedPublishDate = selectedPublishDate.toISOString().slice(0, 16);
@@ -325,8 +354,9 @@ function AssignEdit() {
 
 
             <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-                <button type="button" className="btn btn-primary" onClick={() => navigate("/AssignList", { state: { Email: Email,classid:classId} })}>Back</button>
+              <button type="button" className="btn btn-primary" onClick={() => navigate("/AssignList", { state: { Email: Email,classid:classId} })}>Back</button>
               <button type="button" className="btn btn-primary" id="liveToastBtn" onClick={handleButtonClick} disabled={!isFormValid()}>Submit</button>
+              <button type="button" className="btn btn-danger" onClick={handleShowModal}>Delete</button>
             </div>
 
             {showAlert && (
@@ -339,6 +369,28 @@ function AssignEdit() {
       </div>
         </div>
       )}
+      {/* Modal */}
+      <div className={`modal fade ${showModal ? 'show' : ''}`} tabIndex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true" style={{ display: showModal ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="exampleModalLabel">Remove Class</h5>
+              <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Close"></button>
+            </div>
+            <div className="modal-body">
+              Do you want to delete this Assignment?
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleDelete}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

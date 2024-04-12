@@ -1,0 +1,1 @@
+UPLOAD_FOLDER = 'C:/Users/B/Desktop/Project CU/UploadFile'

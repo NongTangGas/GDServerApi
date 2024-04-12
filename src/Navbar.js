@@ -21,7 +21,7 @@ function Navbar() {
   return (
     <div>
          <nav className="navbar navbar-dark bg-primary justify-content-between ">
-          <a className="navbar-brand" href="#"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NameID</a>
+          <a className="navbar-brand" href="#"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Grader</a>
           <form className="form-inline">
           <Link to="/Home">
               <button onClick={handleButtonClick} className="btn btn-outline-light" type="button">Home

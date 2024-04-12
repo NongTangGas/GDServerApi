@@ -15,16 +15,18 @@ function StudentList() {
   const [maxTotal, setMaxTotal] = useState('');
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showname, setshowname] = useState([])
 
   useEffect(() => {
     fetchData();
     fetchUserData();
+    fetchName();
   }, []);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://127.0.0.1:5000/TA/Student/List?CSYID=${classId}`);
+      const response = await fetch(`http://127.0.0.1:5000/TA/Student/List/score?CSYID=${classId}`);
       const data = await response.json();
       setStudents(data.transformed_data);
       setMaxTotal(data.TotalMax);
@@ -41,6 +43,17 @@ function StudentList() {
       const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
       const userdata = await response.json();
       setUserData(userdata);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      // Display an error message to the user
+    }
+  };
+
+  const fetchName = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/TA/Student/List?CSYID=${classId}`);
+      const dataname = await response.json();
+      setshowname(dataname);
     } catch (error) {
       console.error('Error fetching user data:', error);
       // Display an error message to the user
@@ -116,11 +129,14 @@ function StudentList() {
             <div>Loading...</div>
           ) : (
             <ol className="list-group list-group-numbered">
-              {filteredStudents.map((student, index) => (
-                <li key={index} className="list-group-item d-flex">
-                  <div> {student.UID} {student.Name} </div>
-                </li>
+              {showname.map((student, index) => (
+                <div key={index} className="list-group-item d-flex">
+                  <div>
+                    <span style={{marginLeft:'1rem'}} className="fw-bold">Section:</span> {student.Section} | <span className="fw-bold">UID:</span> {student.UID} | <span className="fw-bold">Name:</span> {student.Name}
+                  </div>
+                </div>
               ))}
+
             </ol>
           )}
           <br />
