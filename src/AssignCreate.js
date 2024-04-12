@@ -16,7 +16,6 @@ function AssignCreate() {
   const [showAlert, setShowAlert] = useState(false);
   const [labNum, setLabNum] = useState('');
   const [labName, setLabName] = useState('');
-  const [publishDate, setPublishDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [totalQNum, setTotalQNum] = useState('');
   const [sections, setSections] = useState([1, 2, 3, 4, 5]); //ใส่ sec ที่จะเอา

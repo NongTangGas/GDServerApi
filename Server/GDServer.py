@@ -170,13 +170,15 @@ def get_assigndata():
     cursor.execute(question_datetime_query, (CSYID, LabNumber))
     datetime_data = cursor.fetchall()
     
-    # Transform datetime data
     transformdata['LabTime'] = {}
     for row in datetime_data:
         section = row[0]
         publish = row[1]
         due = row[2]
-        transformdata['LabTime'][section] = {'Publish': publish, 'Due': due}
+        formatted_publish = publish.strftime("%Y-%m-%dT%H:%M")
+        formatted_due = due.strftime("%Y-%m-%dT%H:%M")
+
+        transformdata['LabTime'][section] = {'publishDate': formatted_publish, 'dueDate': formatted_due}
     
     # Query for question and max score
     question_questionsscore_query = """
@@ -192,7 +194,6 @@ def get_assigndata():
     cursor.execute(question_questionsscore_query, (CSYID, LabNumber))
     question_data = cursor.fetchall()
     
-    # Transform question and max score data
     transformdata['Question'] = [{"id": q[0], "score": q[1]} for q in question_data]
     
     # Query for additional files
@@ -208,9 +209,24 @@ def get_assigndata():
     cursor.execute(question_addfile_query, (CSYID, LabNumber))
     file_data = cursor.fetchall()
     
-    # Transform file data
     transformdata['file'] = [f[0] for f in file_data]
+    
+    # Query for Section
+    question_section_query = """
+    SELECT
+        Section
+    FROM
+        assign ASN
+        INNER JOIN section SCT ON SCT.CID = ASN.CID
+    WHERE
+        ASN.CSYID = %s
+        AND ASN.Lab = %s
+    """
+    cursor.execute(question_section_query, (CSYID, LabNumber))
+    section = cursor.fetchall()
 
+    transformdata['section'] = [f[0] for f in section]
+    
     return jsonify(transformdata)
 
     
@@ -1122,87 +1138,144 @@ def TAclass_score():
         
     except mysql.connector.Error as error:
         return jsonify({"error": f"An error occurred: {error}"}), 500
+    
+@app.route("/TA/Student/List", methods=["GET"])
+def StudentList():
+    
+    CSYID = request.args.get('CSYID')
+    cur = g.db.cursor()
+    TotalScore_query = """ 
+    SELECT
+        BIG.UID,
+        BIG.Name,
+        BIG.Section,
+        SUM(Big.Score) AS TotalScore
+    FROM
+    (
+    SELECT 
+        STD.UID,
+        USR.Name,
+        SCT.Section,
+        QST.Lab,
+        QST.Question,
+        LB.Name as LabName,
+        ASN.Due,
+        SMT.Timestamp,
+        QST.MaxScore,
+        SMT.Score,
+        CASE WHEN SMT.Timestamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
+        CASE WHEN ASN.Due <= SMT.Timestamp THEN TRUE ELSE FALSE END AS Late
+    FROM
+        question QST
+        INNER JOIN lab LB ON QST.CSYID = LB.CSYID AND QST.Lab = LB.lab 
+        INNER JOIN section SCT ON SCT.CSYID = QST.CSYID
+        INNER JOIN assign ASN ON SCT.CID = ASN.CID AND QST.Lab = ASN.Lab AND ASN.Lab = LB.Lab AND ASN.CSYID = LB.CSYID
+        INNER JOIN student STD ON STD.CID = ASN.CID
+        LEFT JOIN submitted SMT ON QST.CSYID = SMT.CSYID AND QST.Lab = SMT.Lab AND QST.Question = SMT.Question AND SMT.UID = STD.UID
+        INNER JOIN user USR ON USR.UID = STD.UID
+    WHERE
+        QST.CSYID = %s
+    ) as BIG
+    GROUP BY
+        BIG.UID, BIG.Section
+    """
+    cur.execute(TotalScore_query,(CSYID))
+    TotalResult = cur.fetchall()
+    
+    transformed_data = []
+
+    for row in TotalResult:
+        UID , Name, Section, TotalScore= row
+        transformed_data.append({'UID': UID, 'Name': Name, 'Section': Section, 'Score': TotalScore})
+        
+    MaxScore_query = """ 
+        SELECT
+            SUM(QST.MaxScore) as TotalMax 
+        FROM
+            Question QST
+        WHERE
+            QST.CSYID = %s
+        GROUP BY
+            QST.CSYID
+    """
+    cur.execute(MaxScore_query,(CSYID))
+    TotalMax = cur.fetchone()[0]
+    
+    Full_transformed_data = {'TotalMax': TotalMax, 'transformed_data': transformed_data}
+
+    
+    return jsonify(Full_transformed_data)
 
 @app.route("/TA/Student/LabList", methods=["GET"])
 def LabStudentList():
     #ลืม section
-        #Param
-        class_id = request.args.get('class_id')
-        school_year = request.args.get('school_year')
+    #Param
+    class_id = request.args.get('class_id')
+    school_year = request.args.get('school_year')
+    
+    # Create a cursor
+    cur = g.db.cursor()
+    query = """
+        SELECT
+        	QST.LAB,
+            QST.Question,
+            USR.EmailName,
+            CLS.Section,
+            USR.Name,
+            SMT.TimeStamp,
+            SMT.Score,
+            QST.MaxScore,
+            ASN.DueTime,
+            CASE WHEN SMT.TimeStamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
+            CASE WHEN ASN.DueTime <= SMT.TimeStamp THEN TRUE ELSE FALSE END AS Late
+        FROM
+        	Question QST
+            INNER JOIN class CLS 
+            INNER JOIN userclass USC ON CLS.ID = USC.IDClass 
+            INNER JOIN submitted SMT ON QST.LAB = SMT.LAB AND QST.Question = SMT.Question
+            INNER JOIN assign ASN ON QST.LAB = ASN.LAB
+            INNER JOIN user USR ON USC.Email = USR.Email
+        WHERE
+            QST.ClassID = %s
+            AND QST.SchoolYear = %s
+            AND QST.ClassID = ASN.ClassID AND ASN.ClassID = SMT.ClassID AND SMT.ClassID = CLS.ClassID
+        	AND QST.SchoolYear = ASN.SchoolYear AND ASN.SchoolYear = SMT.SchoolYear AND SMT.SchoolYear = CLS.SchoolYear
+            AND LEFT(USC.Email, LOCATE('@', USC.Email) - 1) = SMT.StudentID
+        ORDER BY
+        	USR.EmailName ASC,QST.LAB ASC, QST.Question ASC;
+                """
+    # Execute a SELECT statement
+    cur.execute(query,(class_id,school_year))
+    # Fetch all rows
+    data = cur.fetchall()
+    transformed_data = {}
+    for row in data:
+        lab, question, emailname, section, name, timestamp, score, maxscore, duetime, turn_in, late = row
+        # Convert turn_in and late to boolean values
+        turn_in_bool = bool(turn_in)
+        late_bool = bool(late)
+        # Create LAB if it doesn't exist
+        if emailname not in transformed_data:
+            transformed_data[emailname] = {"EmailName": emailname, "Name": name, "Section":section}
+        # Create LAB dictionary if it doesn't exist
+        if f'LAB{lab}' not in transformed_data[emailname]:
+            transformed_data[emailname][f'LAB{lab}'] = {}
+        # Add question data to LAB dictionary
+        transformed_data[emailname][f'LAB{lab}'][f'Q{question}'] = {
+            'DueTime': duetime,
+            'Score': score,
+            'Maxscore': maxscore,
+            'TimeStamp': timestamp,
+            'Late': late_bool,
+            'TurnIn': turn_in_bool
+        }
+    # Convert the dictionary to a list of values
+    transformed_data_list = list(transformed_data.values())
         
-        # Create a cursor
-        cur = g.db.cursor()
-
-        query = """
-            SELECT
-            	QST.LAB,
-                QST.Question,
-                USR.EmailName,
-                CLS.Section,
-                USR.Name,
-                SMT.TimeStamp,
-                SMT.Score,
-                QST.MaxScore,
-                ASN.DueTime,
-                CASE WHEN SMT.TimeStamp IS NOT NULL THEN TRUE ELSE FALSE END As TurnIn,
-                CASE WHEN ASN.DueTime <= SMT.TimeStamp THEN TRUE ELSE FALSE END AS Late
-            FROM
-            	Question QST
-                INNER JOIN class CLS 
-                INNER JOIN userclass USC ON CLS.ID = USC.IDClass 
-                INNER JOIN submitted SMT ON QST.LAB = SMT.LAB AND QST.Question = SMT.Question
-                INNER JOIN assign ASN ON QST.LAB = ASN.LAB
-                INNER JOIN user USR ON USC.Email = USR.Email
-            WHERE
-                QST.ClassID = %s
-                AND QST.SchoolYear = %s
-                AND QST.ClassID = ASN.ClassID AND ASN.ClassID = SMT.ClassID AND SMT.ClassID = CLS.ClassID
-            	AND QST.SchoolYear = ASN.SchoolYear AND ASN.SchoolYear = SMT.SchoolYear AND SMT.SchoolYear = CLS.SchoolYear
-                AND LEFT(USC.Email, LOCATE('@', USC.Email) - 1) = SMT.StudentID
-            ORDER BY
-            	USR.EmailName ASC,QST.LAB ASC, QST.Question ASC;
-                    """
-
-        # Execute a SELECT statement
-        cur.execute(query,(class_id,school_year))
-        # Fetch all rows
-        data = cur.fetchall()
-
-        transformed_data = {}
-
-        for row in data:
-            lab, question, emailname, section, name, timestamp, score, maxscore, duetime, turn_in, late = row
-
-            # Convert turn_in and late to boolean values
-            turn_in_bool = bool(turn_in)
-            late_bool = bool(late)
-
-            # Create LAB if it doesn't exist
-            if emailname not in transformed_data:
-                transformed_data[emailname] = {"EmailName": emailname, "Name": name, "Section":section}
-
-            # Create LAB dictionary if it doesn't exist
-            if f'LAB{lab}' not in transformed_data[emailname]:
-                transformed_data[emailname][f'LAB{lab}'] = {}
-
-            # Add question data to LAB dictionary
-            transformed_data[emailname][f'LAB{lab}'][f'Q{question}'] = {
-                'DueTime': duetime,
-                'Score': score,
-                'Maxscore': maxscore,
-                'TimeStamp': timestamp,
-                'Late': late_bool,
-                'TurnIn': turn_in_bool
-            }
-
-        # Convert the dictionary to a list of values
-        transformed_data_list = list(transformed_data.values())
-            
-        # Close the cursor
-        cur.close()
-
-        # Convert the result to the desired structure
-        return jsonify(transformed_data_list)
+    # Close the cursor
+    cur.close()
+    # Convert the result to the desired structure
+    return jsonify(transformed_data_list)
 
 
 if __name__ == '__main__':

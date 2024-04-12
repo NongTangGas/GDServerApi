@@ -12,10 +12,11 @@ function AssignEdit() {
   const classId = classData.classid;
   const oldlab = classData.lab;
   const oldlabname = classData.labname;
-
+  const [lab, setLab] = useState(null);
 
 
   const [showAlert, setShowAlert] = useState(false);
+
   const [labNum, setLabNum] = useState('');
   const [labName, setLabName] = useState('');
   const [publishDate, setPublishDate] = useState('');
@@ -27,62 +28,92 @@ function AssignEdit() {
   const [checkedSections, setCheckedSections] = useState([]);
   const currentDate = new Date().toISOString().slice(0, 16);
   const [submittedDates, setSubmittedDates] = useState({});
+  const [isLoading, setIsLoading] = useState(true); // Add isLoading state
+
 
   useEffect(() => {
+    const fetchLab = async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:5000/TA/class/Assign/data?CSYID=${classId}&labnumber=${oldlab}`);
+        const data = await response.json();
+        console.log('sections:', data);
+        setTotalQNum(data.Question.length);
+        setScores(data.Question)
+        setCheckedSections(data.section)
+        setSubmittedDates(data.LabTime)
+        console.log(submittedDates)
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
     const fetchSection = async () => {
       try {
         const response = await fetch(`http://127.0.0.1:5000/section?CSYID=${classId}`);
         const data = await response.json();
         console.log('sections:', data);
         setSections(data);
+        
+
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
     };
-    
+
+    fetchLab()
     fetchSection()
-  }, []);
+
+    setLabNum(oldlab)
+    setLabName(oldlabname)
+
+    //Set QuestionNumber
+    const event = {
+      target: {
+        value: totalQNum 
+      }
+    };
+    handleTotalQNumChangeWrapper(event);
+
+    //Set QuestionScore
+    Question.forEach(item => {
+      const id = item.id;
+      const score = item.score;
+      handleScoreChange(id, score);
+    });
+    
+    //Set Publish&Due
+    
+
+    setIsLoading(false)
+  }, [totalQNum]);
 
   const handlePublishDateChange = (e, section) => {
     const selectedPublishDate = new Date(e.target.value);
-    const currentDate = new Date();
-    const selectedDueDate = new Date(submittedDates[section]?.dueDate); // ใช้ข้อมูล dueDate ของ section เดียวกัน
-  
-    if (selectedPublishDate < currentDate) {
-      alert('Publish Date cannot be in the past.');
-      e.target.value = '';
-    } else if (selectedPublishDate > selectedDueDate) {
-      alert('Publish Date cannot be after Due Date.');
-      e.target.value = '';
-    } else {
-      setSubmittedDates(prevState => ({
-        ...prevState,
-        [section]: {
-          ...prevState[section],
-          publishDate: e.target.value,
-        }
-      }));
-    }
+    const formattedPublishDate = selectedPublishDate.toISOString().slice(0, 16);
+    // Update state with formatted date
+    setSubmittedDates(prevState => ({
+      ...prevState,
+      [section]: {
+        ...prevState[section],
+        publishDate: formattedPublishDate,
+      }
+    }));
   };
   
   const handleDueDateChange = (e, section) => {
     const selectedDueDate = new Date(e.target.value);
-    const selectedPublishDate = new Date(submittedDates[section]?.publishDate); // ใช้ข้อมูล publishDate ของ section เดียวกัน
-    const currentDate = new Date();
-  
-    if (selectedDueDate < selectedPublishDate || selectedDueDate < currentDate) {
-      setShowAlert(true);
-    } else {
-      setShowAlert(false);
-      setSubmittedDates(prevState => ({
-        ...prevState,
-        [section]: {
-          ...prevState[section],
-          dueDate: e.target.value,
-        }
-      }));
-    }
+    const formattedDueDate = selectedDueDate.toISOString().slice(0, 16);
+    // Update state with formatted date
+    setSubmittedDates(prevState => ({
+      ...prevState,
+      [section]: {
+        ...prevState[section],
+        dueDate: formattedDueDate,
+      }
+    }));
   };
+  
+  
   
   const handleCheckboxChange = (section) => {
     if (checkedSections.includes(section)) {
@@ -90,9 +121,11 @@ function AssignEdit() {
     } else {
       setCheckedSections([...checkedSections, section]);
     }
-    
-    // Sort sections
     setSections([...sections].sort((a, b) => a - b));
+  };
+
+  const handleTotalQNumChangeWrapper = (e) => {
+    handleTotalQNumChange(e);
   };
 
   const handleTotalQNumChange = (e) => {
@@ -105,6 +138,7 @@ function AssignEdit() {
     }));
     setScores(newScores);
   };
+  
 
   const handleScoreChange = (id, score) => {
     const updatedScores = Question.map((item) =>
@@ -168,7 +202,12 @@ function AssignEdit() {
     <div>
       <Navbarprof />
       <br />
-      <div className="media d-flex align-items-center">
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : (
+        <div>
+          
+<div className="media d-flex align-items-center">
       <span style={{ margin: '0 10px' }}></span>
         <img
           className="mr-3"
@@ -190,11 +229,11 @@ function AssignEdit() {
           <form className="row g-3">
             <div className="col-md-6">
               <label htmlFor="LabNum" className="form-label">Lab Number*</label>
-              <input type="number" min="1" className="form-control" id="LabNum" onChange={(e) => setLabNum(e.target.value)} />
+              <input type="number" min="1" className="form-control" id="LabNum" value={oldlab} onChange={(e) => setLabNum(e.target.value)} />
             </div>
             <div className="col-md-6">
               <label htmlFor="LabName" className="form-label">Lab Name*</label>
-              <input type="name" className="form-control" id="LabName" onChange={(e) => setLabName(e.target.value)} />
+              <input type="name" className="form-control" id="LabName" value={oldlabname} onChange={(e) => setLabName(e.target.value)} />
             </div>
 
             <div className="col-6">
@@ -203,7 +242,7 @@ function AssignEdit() {
             </div>
             <div className="col-md-6">
               <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>
-              <input type="number" min="1" className="form-control" id="inputQnum" onChange={handleTotalQNumChange} />
+              <input type="number" min="1" className="form-control" id="inputQnum" value={totalQNum} onChange={handleTotalQNumChange} />
             </div>
 
             {Question.map((scoreItem) => (
@@ -285,6 +324,8 @@ function AssignEdit() {
           </form>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
