@@ -113,9 +113,7 @@ function AssignList() {
           <h5>210xxx comp prog 2566/2 sec1</h5>
           <h6>Instructor: Name Surname</h6>
         </div>
-        <Link to="/StudentList">
-          <button type="button" className="btn btn-secondary" style={{ marginLeft: 40 + 'em' }}>Student lists</button>
-        </Link>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate("/StudentList", { state: { Email: Email,classid:classId} })} style={{ marginLeft: 40 + 'em' }}>Student lists</button>
       </div>
 
       <br></br>

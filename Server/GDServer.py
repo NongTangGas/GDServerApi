@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, Response
 from flask_cors import CORS
 import pymysql
 from werkzeug.utils import secure_filename
@@ -8,6 +8,7 @@ import csv
 from datetime import datetime
 import pytz
 import json
+from io import StringIO
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
@@ -61,13 +62,24 @@ def isIPYNB(filename):
 def isPicture(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
+def GetClassSchoolyear(dbCLS,cursor,CSYID):
+    try:
+        query = """SELECT ClassID,SchoolYear FROM class CLS WHERE CSYID=%s"""
+        cursor.execute(query,(CSYID))
+        # Fetch all rows
+        data = cursor.fetchall()[0]
+        return data
+    except Exception as e:
+        dbCLS.rollback()
+        return False
+
 def GetCSYID(dbCLS,cursor,ClassID,SchoolYear):
     try:
         query = """SELECT CSYID FROM class CLS WHERE CLS.ClassID = %s AND CLS.SchoolYear = %s"""
         cursor.execute(query,(ClassID,SchoolYear))
         # Fetch all rows
-        dbCLS = cursor.fetchone()
-        return dbCLS[0]
+        data = cursor.fetchone()
+        return data[0]
     except Exception as e:
         dbCLS.rollback()
         return False
@@ -1205,6 +1217,61 @@ def StudentList():
 
     
     return jsonify(Full_transformed_data)
+
+@app.route("/TA/Student/List/CSV", methods=["POST"])
+def CSVList():   
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Parse JSON data from the request
+    data = json.loads(request.form.get('CSV_data'))
+    CSV_data = data["CSV_data"]
+    MaxTotal = data["MaxTotal"]
+    CSYID = data["CSYID"]
+
+    print(CSV_data)
+    print(MaxTotal)
+    print(CSYID)
+    
+    ClassID, SchoolYear = GetClassSchoolyear(conn, cursor, CSYID) 
+    
+    # Specify the initial fieldnames
+    fieldnames = ['UID', 'Name', 'Section', 'Score']
+
+    print('Fieldnames:', fieldnames)
+    print('First row keys:', CSV_data[0].keys())
+
+    # Create a temporary in-memory buffer to store the CSV data
+    temp_output = StringIO()
+    
+    # Create a DictWriter object and write the CSV data to the temporary buffer
+    writer = csv.DictWriter(temp_output, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in CSV_data:
+        writer.writerow(row)
+
+    # Read the CSV data from the temporary buffer
+    temp_output.seek(0)
+    temp_csv_data = temp_output.getvalue()
+    temp_output.close()
+
+    # Modify the header names in the CSV data
+    modified_csv_data = temp_csv_data.replace('Score', f'Score ({MaxTotal})')
+
+    # Create an in-memory binary stream for the final output
+    output = StringIO(modified_csv_data)
+
+    # Set response headers to indicate CSV content
+    headers = {
+        "Content-Disposition": f"attachment; filename={ClassID}-{SchoolYear}.csv",
+        "Content-Type": "text/csv"
+    }
+
+    # Return the content of the final output stream as a Flask response
+    return Response(output.getvalue(), headers=headers)
+
+
+
 
 @app.route("/TA/Student/LabList", methods=["GET"])
 def LabStudentList():
