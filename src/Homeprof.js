@@ -23,7 +23,6 @@ function Homeprof() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [isdelete, setdelete] = useState(false);
   
-  const filename = "21.jpg"; // or any other filename you want to fetch dynamically
 
   
 
@@ -146,12 +145,12 @@ function Homeprof() {
                 )}
       <br />
       <div className="d-flex align-items-center">
-        <h5 className="me-2">Course</h5>
+        <h5 className="me-2" style={{marginLeft:'10px'}}>Course</h5>
         {!expanded ? (<button  onClick={handleToggleExpand} className="btn btn-outline-secondary" type="button" id="button-addon2">+ New</button>) : null }
       </div>
       {!expanded ? (null) : ( 
           <div className="container d-flex justify-content-center">
-            <div className="card" style={{ width: '640px' }}>
+            <div className="card" style={{ width: '800px' }}>
               <div className="card-header">
                 <h4>Create Class</h4>
               </div>
@@ -159,15 +158,15 @@ function Homeprof() {
                 <form className="row g-3">
                   <div className="col-md-3">
                     <label htmlFor="inputID" className="form-label">Class ID</label>
-                    <input type="text" name="ClassID" className="form-control" id="inputID" onChange={handleChange} />
+                    <input type="text" name="ClassID" className="form-control" id="inputID" placeholder="e.g., 2301240"  onChange={handleChange} />
                   </div>
                   <div className="col-md-3">
-                    <label htmlFor="inputYear" className="form-label">School Year</label>
-                    <input type="text" name="SchoolYear" className="form-control" id="inputYear" onChange={handleChange} />
+                    <label htmlFor="inputYear" className="form-label">Academic year/Semester</label>
+                    <input type="text" name="SchoolYear" className="form-control" id="inputYear" placeholder="e.g., 2021/2" onChange={handleChange} />
                   </div>
                   <div className="col-6">
                     <label htmlFor="inputName" className="form-label">Class Name</label>
-                    <input type="text" name="ClassName" className="form-control" id="inputClass" onChange={handleChange} />
+                    <input type="text" name="ClassName" className="form-control" id="inputClass" placeholder="e.g., Introduction to Computer Science" onChange={handleChange} />
                   </div>
                   <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                     <button type="button" className="btn btn-danger" onClick={handleCancel}>Cancel</button>
@@ -199,6 +198,7 @@ function Homeprof() {
                     {classes.map(course => (
                       <div key={course.ID} className="col">
                         <div className="card h-100" style={{width: '15rem'}}><div>
+                          
                           <img src={course.Thumbnail ? "/Thumbnail/" + course.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
 
                           </div>

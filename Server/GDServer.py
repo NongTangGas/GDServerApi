@@ -661,7 +661,7 @@ def get_all():
                 LEFT JOIN (
                     SELECT Lab, SUM(Score) AS Score
                     FROM submitted
-                    WHERE CSYID = %s
+                    WHERE CSYID = %s AND UID = %s
                     GROUP BY Lab
                 ) AS Scores ON QST.Lab = Scores.Lab
             WHERE
@@ -670,7 +670,7 @@ def get_all():
                  """
 
         # Execute a SELECT statement
-        cur.execute(query, (student_id,class_id,class_id,class_id))
+        cur.execute(query, (student_id,class_id,class_id, student_id, class_id))
         # Fetch all rows
         data = cur.fetchall()
 

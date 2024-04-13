@@ -197,7 +197,7 @@ function AssignCreate() {
 
             <div className="col-6">
               <label htmlFor="inputlink" className="form-label">Attach Link</label>
-              <input type="text" className="form-control" id="inputlink" placeholder="link1, link2 or -" />
+              <input type="text" className="form-control" id="inputlink" placeholder="link1,link2 (seperated by comma)" />
             </div>
             <div className="col-md-6">
               <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>

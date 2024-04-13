@@ -82,7 +82,7 @@ function Home() {
                     {classes.map(course => (
                       <div key={course.ID} className="col">
                         <div className="card h-100" style={{width: '15rem'}}><div>
-                          <img src={course.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
+                          <img src={course.Thumbnail ? "/Thumbnail/" + course.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
                           </div>
                           <div className="card-body" style={{ overflowY: 'scroll', height:'10rem',margin:'0',paddingBottom:"0"}}>
                             <h5 style={{margin:"0"}} className="card-title">{course.ClassName}</h5>
@@ -121,7 +121,7 @@ function Home() {
                     {classes.map(course => (
                       <div key={course.ID} className="col">
                         <div className="card h-100" style={{width: '15rem'}}><div>
-                          <img src={course.Thumbnail||"https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
+                          <img src={course.Thumbnail ? "/Thumbnail/" + course.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"} className="card-img-top" style={{ padding:'15px',width: '100%', height: '100%'}}  alt="..."/>
                           </div>
                           <div className="card-body" style={{ overflowY: 'scroll' }}>
                             <h5 className="card-title">{course.ClassName}</h5>
