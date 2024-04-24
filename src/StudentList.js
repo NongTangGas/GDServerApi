@@ -16,11 +16,13 @@ function StudentList() {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showname, setshowname] = useState([])
+  const [classDetail, setClassDetail] = useState(null);
 
   useEffect(() => {
     fetchData();
     fetchUserData();
     fetchName();
+    fetchClassData();
   }, []);
 
   const fetchData = async () => {
@@ -35,6 +37,17 @@ function StudentList() {
       // Display an error message to the user
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchClassData = async () => {
+    try {
+      const classResponse = await fetch(`http://127.0.0.1:5000/class/TA/data?CSYID=${classId}`);
+      const classData = await classResponse.json();
+      setClassDetail(classData);
+
+    } catch (error) {
+      console.error('Error fetching user data:', error);
     }
   };
 
@@ -103,16 +116,16 @@ function StudentList() {
     <div>
       <Navbarprof />
       <br />
-      <div className="media d-flex align-items-center">
+      {classDetail ? (
+        <div className="media d-flex align-items-center">
         <span style={{ margin: '0 10px' }}></span>
-        <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} />
+        <img className="mr-3" src={classDetail.Thumbnail ? "/Thumbnail/" + classDetail.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"}  style={{ width: '40px', height: '40px' }} />
         <span style={{ margin: '0 10px' }}></span>
-        <div className="card" style={{ width: '30rem', padding: '10px' }}>
-          <h5>210xxx comp prog 2566/2 sec1</h5>
-          <h6>Instructor: Name Surname</h6>
+          <h5>{classDetail.ClassID} {classDetail.ClassName} {classDetail.SchoolYear}</h5>
+          <h6></h6>
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: '40em' }} onClick={handleExport}>Export</button>
       </div>
-        <button type="button" className="btn btn-secondary" style={{ marginLeft: '40em' }} onClick={handleExport}>Export</button>
-      </div>
+      ):("")}
       <br />
       <div className="card" style={{ marginLeft: '10em', marginRight: '10em' }}>
         <div className="card-header">
@@ -120,9 +133,9 @@ function StudentList() {
         </div>
         <div className="card-body" style={{ overflowY: 'scroll' }}>
           {/* Search input */}
-          <form className="d-flex">
+          {/* <form className="d-flex">
             <input className="form-control me-2" type="search" placeholder="Search ID or Name" aria-label="Search" onChange={handleSearch} />
-          </form>
+          </form> */}
           <br />
           {/* Loading indicator */}
           {isLoading ? (

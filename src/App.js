@@ -1,54 +1,46 @@
-import React,{ useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import Navbar from './Navbar.js';
-import { useNavigate,useLocation } from 'react-router-dom';
-import { Link } from 'react-router-dom';
-
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function App() {
   const navigate = useNavigate();
-
-  const [assignmentData, setAssignmentData] = useState(null);
-  const [userData, setUserData] = useState(null);
   const location = useLocation();
   const classData = location.state;
   const Email = classData.Email;
   const classId = classData.classid;
 
+  const [assignmentData, setAssignmentData] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [classDetail, setClassDetail] = useState(null);
 
   useEffect(() => {
-    console.log('getHome:',classData);
+    const fetchData = async () => {
+      try {
+        // Fetch user data
+        const userResponse = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
+        const userData = await userResponse.json();
+        setUserData(userData);
 
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/ST/user/profile?Email=${Email}`);
-        const userdata = await response.json();
-        console.log('user:', userdata);
-        setUserData(userdata);
-        console.log(userdata.ID);
-        // Call fetchData here after setting userData
-        fetchData(userdata.ID);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    };
-  
-    const fetchData = async (userId) => {
-      try {
-        console.log(classId)
-        const response = await fetch(`http://127.0.0.1:5000/ST/assignment/all?SID=${userId}&CID=${classId}`);
-        const data = await response.json();
-        console.log(data);
-        setAssignmentData(data);
+        // Fetch class data
+        const classResponse = await fetch(`http://127.0.0.1:5000/class/ST/data?CSYID=${classId}&UID=${userData.ID}`);
+        const classData = await classResponse.json();
+        setClassDetail(classData);
+
+        // Fetch assignment data
+        const assignmentResponse = await fetch(`http://127.0.0.1:5000/ST/assignment/all?SID=${userData.ID}&CID=${classId}`);
+        const assignmentData = await assignmentResponse.json();
+        setAssignmentData(assignmentData);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
-  
-    fetchUserData();
+
+
     
-  }, []);
+    fetchData();
+  }, [Email, classId]);
   
   //Check TurnIn Late
   function CheckSend(labData) {
@@ -116,71 +108,68 @@ function App() {
 
 
 
-  return (
-    
-      <div className="App">
-        <Navbar></Navbar> 
-          <br></br>
-          <div className="media d-flex align-items-center">
-          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png"  style={{ width: '40px', height: '40px' }} />
-             <h5>&nbsp;&nbsp;&nbsp;&nbsp; 210xxx comp prog 2566/2 sec1</h5>
+return (
+  <div className="App">
+    <Navbar />
+    {userData && classDetail && assignmentData ? (
+      <>
+        <br />
+        <div className="media d-flex align-items-center">
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img className="mr-3" src={classDetail.Thumbnail ? "/Thumbnail/" + classDetail.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"}  style={{ width: '40px', height: '40px' }} />
+          <h5>&nbsp;&nbsp;&nbsp;&nbsp; {classDetail.ClassID} {classDetail.ClassName} {classDetail.SchoolYear} Sec{classDetail.Section}</h5>
+        </div>
+        <br />
+        <div className="card text-left" style={{ marginLeft: '10em', marginRight: '10em' }}>
+          <div className="card-header">
+            <ul className="nav nav-tabs card-header-tabs">
+              <li className="nav-item">
+                <a className="nav-link active">Assignments</a>
+              </li>
+            </ul>
           </div>
-
-          <br />
-
-          <div className="card text-left" style={{ marginLeft: 10 +'em', marginRight: 10 + 'em' }}>
-            <div className="card-header">
-              <ul className="nav nav-tabs card-header-tabs">
-                <li className="nav-item">
-                  <a className="nav-link active">Assignments</a>
-                </li>
-              </ul>
+          {assignmentData && Object.keys(assignmentData.Assignment).length > 0 ? (
+            <div>
+              {Object.keys(assignmentData.Assignment).map((lab) => {
+                const labInfo = assignmentData.Assignment[lab];
+                return (
+                  <div key={lab} className="card-body">
+                    <ol className="list-group">
+                      <button onClick={() => navigate("/Lab", { state:{ Email: Email,lab:lab.slice(-1),classid:classId} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+                        <div className="ms-2 me-auto">
+                          <div className="fw-bold">
+                            {lab}: {labInfo.Name}
+                          </div>
+                          <div className='row'>
+                            <div className='col-sm-12'>Due date: {labInfo.Due}</div>
+                            <div className='col-sm-12'>Score - ({labInfo.Score}/{labInfo.Maxscore})</div>
+                          </div>
+                        </div>
+                        {generateBadge(labInfo)}
+                      </button>
+                    </ol>
+                  </div>
+                );
+              })}
             </div>
-    
-             {assignmentData && Object.keys(assignmentData.Assignment).length > 0 ? (
-             <div>
-               {Object.keys(assignmentData.Assignment).map((lab) => {
-                 const labInfo = assignmentData.Assignment[lab];
-                 return (
-                   <div key={lab} className="card-body">
-                     <ol className="list-group">
-                       <button onClick={() => navigate("/Lab", { state:{ Email: Email,lab:lab.slice(-1),classid:classId} })} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
-                         <div className="ms-2 me-auto">
-                           <div className="fw-bold">
-                             {lab}: {labInfo.Name}
-                           </div>
-                           <div className='row'>
-                           <div className='col-sm-12'>Due date: {labInfo.Due}</div>
-                           <div className='col-sm-12'>Score - ({labInfo.Score}/{labInfo.Maxscore})</div>
-                           </div>
-                         </div>
-                         {generateBadge(labInfo)}
-                       </button>
-                     </ol>
-                   </div>
-                 );
-               })}
-             </div>
-           ) : (
-            assignmentData && Object.keys(assignmentData.Assignment).length == 0 ? (
+          ) : (
+            assignmentData && Object.keys(assignmentData.Assignment).length === 0 ? (
               <div className="card-body">
                 <ol className="list-group">
-                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{padding:'1rem'}}>
+                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{ padding: '1rem' }}>
                     <div className="ms-2 me-auto">
-                      <div className="fw-bold" style={{fontSize:'larger'}}>
+                      <div className="fw-bold" style={{ fontSize: 'larger' }}>
                         There is no assignment
                       </div>
                     </div>
                   </button>
                 </ol>
               </div>
-            ) : 
-            (
+            ) : (
               <div className="card-body">
                 <ol className="list-group">
-                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{padding:'1rem'}}>
+                  <button className="list-group-item list-group-item-action d-flex justify-content-between align-items-start" style={{ padding: '1rem' }}>
                     <div className="ms-2 me-auto">
-                      <div className="fw-bold" style={{fontSize:'larger'}}>
+                      <div className="fw-bold" style={{ fontSize: 'larger' }}>
                         Loading...
                       </div>
                     </div>
@@ -188,13 +177,12 @@ function App() {
                 </ol>
               </div>
             )
-            
-            )}
+          )}
         </div>
-     
-      </div>
-  );
+      </>
+    ) : ("")}
+  </div>
+);
 }
-
 
 export default App;

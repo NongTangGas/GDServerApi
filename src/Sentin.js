@@ -3,7 +3,8 @@ import Navbarprof from './Navbarprof'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 
-function Sentin({ Q = 2 }) {
+function Sentin() {
+  const [Q, setQ] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,6 +21,7 @@ function Sentin({ Q = 2 }) {
   const [newScores, setNewScores] = useState({}); // เก็บค่า New Scores สำหรับแต่ละคอลัมน์ Q
   const [searchQuery, setSearchQuery] = useState('');
   const [lastEditedTimestamp, setLastEditedTimestamp] = useState(null);
+  const [classDetail, setClassDetail] = useState(null);
 
 
   const [assignments, setassignments] = useState({
@@ -79,11 +81,25 @@ function Sentin({ Q = 2 }) {
         const data = await response.json();
         console.log('sections:', data);
         setassignments(data);
+        setQ(Object.keys(data.Questions).length)
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
     };
+    const fetchClassData = async () => {
+      try {
+        const classResponse = await fetch(`http://127.0.0.1:5000/class/TA/data?CSYID=${classId}`);
+        const classData = await classResponse.json();
+        setClassDetail(classData);
+
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
     fetchSection()
+    fetchClassData()
+    
   }, []);
 
 
@@ -178,19 +194,16 @@ function Sentin({ Q = 2 }) {
     <div>
       <Navbarprof />
       <br />
-      <div className="media d-flex align-items-center">
+      {classDetail ? (
+        <div className="media d-flex align-items-center">
         <span style={{ margin: '0 10px' }}></span>
-        <img
-          className="mr-3"
-          src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png"
-          style={{ width: '40px', height: '40px' }}
-        />
+        <img className="mr-3" src={classDetail.Thumbnail ? "/Thumbnail/" + classDetail.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"}  style={{ width: '40px', height: '40px' }} />
         <span style={{ margin: '0 10px' }}></span>
-        <div className="card" style={{ width: '30rem', padding: '10px' }}>
-          <h5>210xxx comp prog 2566/2 sec1</h5>
-          <h6>Instructor: Name Surname</h6>
-        </div>
+          <h5>{classDetail.ClassID} {classDetail.ClassName} {classDetail.SchoolYear}</h5>
+          <h6></h6>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate("/StudentList", { state: { Email: Email,classid:classId} })} style={{ marginLeft: 40 + 'em' }}>Student lists</button>
       </div>
+      ):("")}
       <br />
       <div className="card text-left" style={{ marginLeft: '10em', marginRight: '10em' }}>
         <div className="card-header">
@@ -207,14 +220,15 @@ function Sentin({ Q = 2 }) {
         </div>
         <br />
         <div className="card-body" style={{ overflowX: 'auto', overflowY: 'auto' }}>
-          <form className="d-flex">
+          {/* <form className="d-flex">
             <input className="form-control me-2" type="search" placeholder="search id or name" aria-label="Search" onChange={handleSearch}/>
-          </form>
+          </form> */}
           <br />
           <table className="table table-hover">
             <thead>
               <tr>
                 <th scope="col">No.</th>
+                <th scope="col">Section</th>
                 <th scope="col">ID</th>
                 <th scope="col">Name</th>
                 {[...Array(Q)].map((_, index) => (
@@ -226,6 +240,7 @@ function Sentin({ Q = 2 }) {
             {Object.keys(assignments.Questions["1"].Scores).map((studentId, rowIndex) => (
               <tr key={rowIndex}>
                 <th scope="row">{rowIndex + 1}</th>
+                <td>{assignments.Questions["1"].Scores[studentId]?.Section}</td>
                 <td>{String(studentId)}</td> {/* Render student ID */}
                 <td>{assignments.Questions["1"].Scores[studentId]?.Name}</td> {/* Render student name */}
                 {[...Array(Q)].map((_, colIndex) => {

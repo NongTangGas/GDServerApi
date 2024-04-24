@@ -24,6 +24,8 @@ function AssignCreate() {
   const [checkedSections, setCheckedSections] = useState([]);
   const currentDate = new Date().toISOString().slice(0, 16);
   const [submittedDates, setSubmittedDates] = useState({});
+  const [links, setLinks] = useState(null);
+  const [classDetail, setClassDetail] = useState(null);
 
 
 
@@ -50,6 +52,18 @@ function AssignCreate() {
   };
   
   useEffect(() => {
+    
+    const fetchClassData = async () => {
+      try {
+        const classResponse = await fetch(`http://127.0.0.1:5000/class/TA/data?CSYID=${classId}`);
+        const classData = await classResponse.json();
+        setClassDetail(classData);
+
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
     const fetchSection = async () => {
       try {
         const response = await fetch(`http://127.0.0.1:5000/section?CSYID=${classId}`);
@@ -61,6 +75,7 @@ function AssignCreate() {
       }
     };
     fetchSection()
+    fetchClassData()
   }, []);
   
   const handleDueDateChange = (e, section) => {
@@ -135,6 +150,7 @@ function AssignCreate() {
     formData.append('CSYID', classId);
     formData.append('Question', JSON.stringify(Question)); // Stringify Question array
     formData.append('submittedDates', JSON.stringify(submittedDates)); // Stringify submittedDates object
+    formData.append('link',links);
     if (isFormValid()) {
       try {
         
@@ -166,19 +182,16 @@ function AssignCreate() {
     <div>
       <Navbarprof />
       <br />
-      <div className="media d-flex align-items-center">
-      <span style={{ margin: '0 10px' }}></span>
-        <img
-          className="mr-3"
-          src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png"
-          style={{ width: '40px', height: '40px' }}
-        />
+      {classDetail ? (
+        <div className="media d-flex align-items-center">
         <span style={{ margin: '0 10px' }}></span>
-        <div className="card" style={{ width: '30rem', padding: '10px' }}>
-          <h5>210xxx comp prog 2566/2 sec1</h5>
-          <h6>Instructor: Name Surname</h6>
-        </div>
+        <img className="mr-3" src={classDetail.Thumbnail ? "/Thumbnail/" + classDetail.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"}  style={{ width: '40px', height: '40px' }} />
+        <span style={{ margin: '0 10px' }}></span>
+          <h5>{classDetail.ClassID} {classDetail.ClassName} {classDetail.SchoolYear}</h5>
+          <h6></h6>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate("/StudentList", { state: { Email: Email,classid:classId} })} style={{ marginLeft: 40 + 'em' }}>Student lists</button>
       </div>
+      ):("")}
       <br />
       <div className="card" style={{ marginLeft: '10em', marginRight: '10em' }}>
         <div className="card-header">
@@ -197,7 +210,7 @@ function AssignCreate() {
 
             <div className="col-6">
               <label htmlFor="inputlink" className="form-label">Attach Link</label>
-              <input type="text" className="form-control" id="inputlink" placeholder="link1,link2 (seperated by comma)" />
+              <input type="text" className="form-control" id="inputlink" placeholder="link1,link2 (seperated by comma)" onChange={(e) => setLinks(e.target.value)} />
             </div>
             <div className="col-md-6">
               <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>
@@ -272,7 +285,7 @@ function AssignCreate() {
 
             <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                 <button type="button" className="btn btn-primary" onClick={() => navigate("/AssignList", { state: { Email: Email,classid:classId} })}>Back</button>
-              <button type="button" className="btn btn-primary" id="liveToastBtn" onClick={handleButtonClick} disabled={!isFormValid()}>Submit</button>
+              <button type="button" className="btn btn-primary" id="liveToastBtn" onClick={handleButtonClick} disabled={!isFormValid()}>Create</button>
             </div>
 
             {showAlert && (

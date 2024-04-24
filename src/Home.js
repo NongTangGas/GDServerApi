@@ -12,7 +12,7 @@ function Home() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [ready, setReady] = useState(null);
 
-  const Email = '6331234567@student.chula.ac.th';
+  const Email = '6531234567@student.chula.ac.th';
 
   
   useEffect(() => {

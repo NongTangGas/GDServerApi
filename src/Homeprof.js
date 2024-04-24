@@ -125,6 +125,7 @@ function Homeprof() {
     } catch (error) {
       console.error('Error');
     }
+    setExpanded(false)
   };
 
   return (
@@ -132,7 +133,7 @@ function Homeprof() {
       <Navbarprof />
       {isdelete && deleteAlert ? (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
-                    Class delete successfully
+                    Class deleted successfully
                     <button type="button" className="btn-close align-items-right" aria-label="Close" onClick={handleDeleteClose}></button>
                   </div>
                 ):(null)}
@@ -169,7 +170,7 @@ function Homeprof() {
                     <input type="text" name="ClassName" className="form-control" id="inputClass" placeholder="e.g., Introduction to Computer Science" onChange={handleChange} />
                   </div>
                   <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <button type="button" className="btn btn-danger" onClick={handleCancel}>Cancel</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
                     <div>
                       <button type="button" className="btn btn-primary" onClick={handleCreateClick}>Create</button>
                       <br />

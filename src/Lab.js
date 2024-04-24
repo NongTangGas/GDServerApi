@@ -16,6 +16,7 @@ function Lab() {
   const [fileSelectedMap, setFileSelectedMap] = useState({}); // Map to track file selection for each question
   const [submissionResponses, setSubmissionResponses] = useState({}); // Map to hold submission responses for each question
   const [userData, setUserData] = useState(null);
+  const [classDetail, setClassDetail] = useState(null);
 
   useEffect(() => {
 
@@ -28,6 +29,18 @@ function Lab() {
         console.log(userdata.ID);
         // Call fetchData here after setting userData
         fetchData(userdata.ID);
+        fetchClassData(userdata.ID)
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    
+    const fetchClassData = async (UID) => {
+      try {
+        const classResponse = await fetch(`http://127.0.0.1:5000/class/ST/data?CSYID=${csyid}&UID=${UID}`);
+        const classData = await classResponse.json();
+        setClassDetail(classData);
+
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
@@ -115,10 +128,11 @@ function Lab() {
     <div>
       <Navbar />
       <br />
+      {userData && classDetail && assignmentData ? (
       <div className="media d-flex align-items-center">
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img className="mr-3" src="https://cdn-icons-png.flaticon.com/512/3426/3426653.png" style={{ width: '40px', height: '40px' }} alt="Icon" />
-        <h5>&nbsp;&nbsp;&nbsp;&nbsp; 210xxx comp prog 2566/2 sec1</h5>
-      </div>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img className="mr-3" src={classDetail.Thumbnail ? "/Thumbnail/" + classDetail.Thumbnail : "https://cdn-icons-png.flaticon.com/512/3643/3643327.png"}  style={{ width: '40px', height: '40px' }} />
+          <h5>&nbsp;&nbsp;&nbsp;&nbsp; {classDetail.ClassID} {classDetail.ClassName} {classDetail.SchoolYear} Sec{classDetail.Section}</h5>
+        </div>):("")}
       <br />
       <div className="container-lg p-3 mb-2 bg-light">
         <div className="row">

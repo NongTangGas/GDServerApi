@@ -15,7 +15,8 @@ function ClassEdit() {
     const [classID, setClassID] = useState('');
     const [schoolYear, setSchoolYear] = useState('');
     const [className, setClassName] = useState('');
-
+    const [responseData1, setResponseData1] = useState('');
+    const [responseData2, setResponseData2] = useState('');
     
     useEffect(() => {
         const PreData = async () => {
@@ -72,9 +73,9 @@ function ClassEdit() {
                 method: 'POST',
                 body: formData,
           });
-            const responseData = await response.json();
-            console.log(responseData);
-            if (responseData.Status)
+            setResponseData1(await response.json())
+            console.log(responseData1);
+            if (responseData1.Status)
                 setShowAlert(true);
         } catch (error) {
             console.error('Error submitting data:', error);
@@ -94,9 +95,9 @@ function ClassEdit() {
                 method: 'POST',
                 body: formData,
             });
-            const responseData = await response.json();
-            console.log(responseData);
-            if (responseData.Status) {
+            setResponseData2(await response.json())
+            console.log(responseData2);
+            if (responseData2.Status) {
                 setShowAlert(true);
             }
         } catch (error) {
@@ -179,10 +180,12 @@ function ClassEdit() {
                 </div>
                 <div class="col-6">
                     <label for="formGroupExampleInput2" class="form-label">Class Picture</label>
+                    
                     <div class="input-group">
                         <input type="file" class="form-control" id="inputGroupFile01" aria-describedby="inputGroupFileAddon04" aria-label="Upload" />
                         <button class="btn btn-outline-primary" type="button" id="inputGroupFileAddon04" onClick={() => handleUpload(0)}>Upload</button>
                     </div>
+                    {responseData1.message}
                     {timestamps[0] && <p class="card-text">Last Submitted: <span>{timestamps[0]}</span></p>}
                 </div>
                 <div class="col-6">
@@ -191,6 +194,7 @@ function ClassEdit() {
                         <input type="file" class="form-control" id="inputGroupFile02" aria-describedby="inputGroupFileAddon04" aria-label="Upload" />
                         <button class="btn btn-outline-primary" type="button" id="inputGroupFileAddon04" onClick={() => handleUpload(1)}>Upload</button>
                     </div>
+                    {responseData2.message}
                     {timestamps[1] && <p class="card-text">Last Submitted: <span>{timestamps[1]}</span></p>}
                 </div>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
