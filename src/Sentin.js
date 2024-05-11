@@ -283,7 +283,14 @@ function Sentin() {
       Score: {assignments.Questions[selectedCell]?.Scores?.[selectedStudentId]?.Score || '-'} / {assignments.Questions[selectedCell]?.MaxScore}
       <br />
       {/* แสดงเวลาที่แก้ไขล่าสุด */}
-      Lastest edited: {assignments.Questions[selectedCell]?.Scores?.[selectedStudentId]?.LastEdit || lastEditedTimestamp && JSON.stringify(lastEditedTimestamp) || '-'}
+      Lastest edited: {
+    assignments.Questions[selectedCell]?.Scores?.[selectedStudentId]?.LastEdit ?
+        new Date(new Date(assignments.Questions[selectedCell].Scores[selectedStudentId].LastEdit).getTime() - 17 * 60 * 60 * 1000).toUTCString() :
+        lastEditedTimestamp ?
+            new Date(new Date(lastEditedTimestamp).getTime() - 17 * 60 * 60 * 1000).toUTCString() :
+            '-'
+}
+
       <br />
       {/* แสดง input เพื่อให้กรอกเวลาใหม่ */}
       {selectedStudentId !== null && selectedStudentId !== undefined && assignments.Questions[selectedCell]?.Scores[selectedStudentId]?.Name && (

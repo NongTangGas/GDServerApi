@@ -22,7 +22,6 @@ function AssignEdit() {
   const [labName, setLabName] = useState('');
   const [publishDate, setPublishDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [totalQNum, setTotalQNum] = useState('');
   const [sections, setSections] = useState([1, 2, 3, 4, 5]); //ใส่ sec ที่จะเอา
   const [Question, setScores] = useState([]);
   const [submittedData, setSubmittedData] = useState(null);
@@ -33,6 +32,36 @@ function AssignEdit() {
   const [inputQnum, setInputQnum] = useState('');
   const [links, setLinks] = useState(null);
   const [classDetail, setClassDetail] = useState(null);
+
+  const [totalQNum, setTotalQNum] = useState(0);
+  const [totalAdditionalFiles, setTotalAdditionalFiles] = useState(0);
+  const [questions, setQuestions] = useState({}); //file เฉลยแต่ละข้อ
+  const [additionalFiles, setAdditionalFiles] = useState([]); //file เพิ่มเติมรวมๆ
+
+  const handleTotalQNumChange = (e) => {
+    const numQuestions = parseInt(e.target.value, 10);
+    setTotalQNum(numQuestions);
+    setQuestions({}); // Clear existing questions
+  };
+
+  const handleTotalAdditionalFileChange = (e) => {
+    const numAdditionalFiles = parseInt(e.target.value, 10);
+    setTotalAdditionalFiles(numAdditionalFiles);
+    setAdditionalFiles([]); // Clear existing additional files
+  };
+
+  const handleQuestionFileChange = (e, index) => {
+    const file = e.target.files[0];
+    setQuestions(prevQuestions => ({
+      ...prevQuestions,
+      [index + 1]: file
+    }));
+  };
+
+  const handleAdditionalFileChange = (e) => {
+    const file = e.target.files[0];
+    setAdditionalFiles(prevFiles => [...prevFiles, file]);
+  };
 
 
   const fetchLab = async () => {
@@ -172,24 +201,6 @@ function AssignEdit() {
     handleTotalQNumChange(e);
   };
 
-  const handleTotalQNumChange = (e) => {
-    let numQuestions = parseInt(e.target.value);
-    if (isNaN(numQuestions) || numQuestions < 1 || numQuestions === null) {
-        numQuestions = 1;
-    } else if (numQuestions > 20) {
-        numQuestions = 20;
-    }
-    setTotalQNum(numQuestions);
-
-    const newScores = Array.from({ length: numQuestions }, (_, index) => ({
-        id: index + 1,
-        score: 1,
-    }));
-    setScores(newScores);
-};
-
-  
-
   const handleScoreChange = (id, score) => {
     const updatedScores = Question.map((item) =>
       item.id === id ? { ...item, score } : item
@@ -201,6 +212,8 @@ function AssignEdit() {
     return (
       labNum !== '' &&
       labName !== '' &&
+      totalQNum !== '' &&
+      links !== '' &&
       checkedSections !== null &&
       checkedSections !== undefined &&
       checkedSections.length > 0 &&
@@ -220,9 +233,15 @@ function AssignEdit() {
     formData.append('labNum', labNum);
     formData.append('labName', labName);
     formData.append('CSYID', classId);
-    formData.append('Question', JSON.stringify(Question)); // Stringify Question array
+    for (const index in questions) {
+      const file = questions[index];
+      formData.append(`Question[${index}]`, file);
+    }
     formData.append('submittedDates', JSON.stringify(submittedDates)); // Stringify submittedDates object
     formData.append('link',links);
+    additionalFiles.forEach(file => {
+      formData.append('AddFile', file);
+    });
     if (isFormValid()) {
       try {
         
@@ -249,6 +268,18 @@ function AssignEdit() {
   const handleAlertClose = () => {
     setShowAlert(false);
   };
+
+  const handleFileInputChange = (event) => {
+    const files = event.target.files;
+    const newFiles = Array.from(files);
+    setAdditionalFiles([...additionalFiles, ...newFiles]);
+};
+
+const handleFileDelete = (index) => {
+    const updatedFiles = [...additionalFiles];
+    updatedFiles.splice(index, 1);
+    setAdditionalFiles(updatedFiles);
+};
 
   return (
     <div>
@@ -283,40 +314,62 @@ function AssignEdit() {
                 </ul>
             </div>
         <div className="card-body">
-          <form className="row g-3">
-            <div className="col-md-6">
-              <label htmlFor="LabNum" className="form-label">Lab Number*</label>
-              <input type="number" min="1" className="form-control" id="LabNum" value={labNum} onChange={(e) => setLabNum(e.target.value)} />
-            </div>
-            <div className="col-md-6">
-              <label htmlFor="LabName" className="form-label">Lab Name*</label>
-              <input type="name" className="form-control" id="LabName" value={labName} onChange={(e) => setLabName(e.target.value)} />
-            </div>
-
-            <div className="col-6">
-              <label htmlFor="inputlink" className="form-label">Attach Link</label>
-              <input type="text" className="form-control" id="inputlink" placeholder="link1,link2 (seperated by comma)" value={links} onChange={(e) => setLinks(e.target.value)} />
-            </div>
-            <div className="col-md-6">
-              <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>
-              <input type="number" min="1" className="form-control" id="inputQnum" value={totalQNum} onChange={(e) => {handleTotalQNumChange(e)}} />
-            </div>
-
-            {Question.map((scoreItem) => (
-              <div key={scoreItem.id} className="col-md-2">
-                <label htmlFor={`inputScore${scoreItem.id}`} className="form-label">
-                  Score Q.{scoreItem.id}
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-control"
-                  id={`inputScore${scoreItem.id}`}
-                  value={scoreItem.score}
-                  onChange={(e) => handleScoreChange(scoreItem.id, e.target.value)}
-                />
+          <form className="row g-3 align-items-center">
+            
+            <div style={{marginTop:'1rem'}} className='row'>
+              <div className="col-md-6">
+                <label htmlFor="LabNum" className="form-label">Lab Number*</label>
+                <input type="number" min="1" className="form-control" id="LabNum" value={labNum} onChange={(e) => setLabNum(e.target.value)} />
               </div>
+              <div className="col-md-6">
+                <label htmlFor="LabName" className="form-label">Lab Name*</label>
+                <input type="name" className="form-control" id="LabName" value={labName} placeholder="e.g., Arrays" onChange={(e) => setLabName(e.target.value)} />
+              </div>
+            </div>
+
+            <div className='row'>
+              <div className="col-md-6">
+                <label htmlFor="inputlink" className="form-label">Question Link*</label>
+                <input type="text" className="form-control" id="inputlink" placeholder="e.g., https://drive.google.com/drive/folders/your-folder-id" value={links} onChange={(e) => setLinks(e.target.value)} />
+                <div className="col-md-6">
+                <span id="textInline" className="form-text" style={{ lineHeight: '1.5', marginTop: '10px' }}>
+                  Must be a Google Drive folder link which contains all question files.
+                </span>
+                </div>
+              </div>
+            </div>
+
+            <div className='row'>
+              <div className="col-md-3">
+              <label htmlFor="inputQnum" className="form-label">Total Question Number*</label>
+              <input type="number" min="1" className="form-control" id="inputQnum" value={totalQNum} onChange={(e) => { handleTotalQNumChange(e); setTotalQNum(e.target.value); }} />
+              </div>
+              <div className="col-md-9">
+                {Array.from({ length: totalQNum }, (_, index) => (
+                  <div key={index} className="input-group mt-3">
+                    <span className="input-group-text">Question {index + 1}</span>
+                    <input type="file" className="form-control" id={`inputGroupFile${index + 1}`} aria-describedby={`inputGroupFileAddon${index + 1}`} aria-label="Upload" onChange={(e) => handleQuestionFileChange(e, index)}/>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+
+          <div style={{marginTop:'1rem',marginBottom:'1rem'}} className='row'>
+            <div  className="col-md-12">
+            <span className="form-label">Additional Files</span>
+            <div style={{marginTop:'0px'}} className="input-group mt-3">
+                <input type="file" className="form-control" id="formFileMultiple" multiple onChange={handleFileInputChange} />
+            </div>
+            {additionalFiles.map((file, index) => (
+            <div key={index} className="input-group mt-3">
+                <span className="input-group-text">File {index + 1}</span>
+                <input type="text" className="form-control" value={file.name} disabled />
+                <button className="btn btn-danger" type="button" onClick={() => handleFileDelete(index)}>Delete</button>
+            </div>
             ))}
+        </div>
+          </div>
 
             <div className="col-md-12">
               <label htmlFor="inputState" className="form-label">Section*</label>

@@ -9,11 +9,12 @@ from datetime import datetime
 import pytz
 import json
 from io import StringIO
-from config import UPLOAD_FOLDER,TESTCASE_FOLDER,SOURCE_FOLDER
+from config import UPLOAD_FOLDER,ADDFILE_FOLDER,SOURCE_FOLDER
 import function.grader as grader
 import re
 import glob
 import time
+import errno
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
@@ -25,7 +26,7 @@ def get_db():
             host='127.0.0.1',
             user='root',
             password='Taotong',
-            database='grader2',
+            database='grader3',
         )
     return g.db
 
@@ -51,6 +52,20 @@ def teardown_request(exception=None):
 
 gmt_timezone = pytz.timezone('GMT')
     
+def delete_txt_files(input_filepath):
+    # Iterate over all files in the input directory
+    for filename in os.listdir(input_filepath):
+        # Check if the file ends with '.txt'
+        if filename.endswith('.txt'):
+            # Construct the full file path
+            file_path = os.path.join(input_filepath, filename)
+            # Attempt to remove the file
+            try:
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+            except Exception as e:
+                print(f"Error deleting {file_path}: {e}")
+                
 """ Global API + Function """
 def isCSV(filename): 
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'csv'
@@ -618,7 +633,7 @@ def TurnIn():
     Question = request.form.get("Question")    
     uploaded_file = request.files["file"]
 
-    upload_time = datetime.now(gmt_timezone)
+    upload_time = datetime.now()
     
     if not isIPYNB(uploaded_file.filename):
         return jsonify({"message": "upload file must be .ipynb"}), 500 
@@ -641,24 +656,36 @@ def TurnIn():
             print("SchoolYear :",SchoolYear)
             ###VVVGraderVVV###
             try:
-                filepath_source = os.path.join(SOURCE_FOLDER,ClassID+"-"+SchoolYear,"Q"+Question+".ipynb")
-                filepath_test = os.path.join(TESTCASE_FOLDER,ClassID+"-"+SchoolYear)
-                tester= glob.glob(filepath_test + "/*.txt")
-                print(filepath_test,filepath_source)
-                
+                source_query = "SELECT PathToQuestion FROM question WHERE Lab = %s AND Question = %s AND CSYID = %s"
+                cursor.execute(source_query, (Lab, Question, CSYID))
+                filepath_source = cursor.fetchone()[0]
+                        
+                addfile_query = "SELECT PathToAddFile FROM addfile WHERE LAB = %s AND CSYID = %s"
+                cursor.execute(addfile_query, (Lab, CSYID))
+                filepath_addfile = cursor.fetchone()[0]
+                print('help:',filepath_addfile)
+                FileToRead= glob.glob(filepath_addfile + "/*.txt")
+                if(FileToRead):
+                    Check="True"
+                else:
+                    Check="ok"
                 AS = []
                 times = []
                 Rscore = [0,0]
 
                 i = time.perf_counter()
                 n = 1
-
-                err, data = grader.grade(filepath_source, filepath_turnin, addfile=tester, validate=False, check_keyword="ok")
+                
+                #grader grading (keyword ok and True)
+                print(filepath_source,filepath_turnin)
+                err, data = grader.grade(filepath_source, filepath_turnin, addfile=FileToRead, validate=False, check_keyword=Check)
                 if(err):
                     print("ERROR:", data)
                 else:
                     AS.append(data)
                 if len(data) == 1:
+                    Rscore[0]=Rscore[0]+data[0][0]
+                    Rscore[1]=Rscore[1]+data[0][1]
                     print(f"Points: {data[0][0]}\nMax Points: {data[0][1]}")
                 else:
                     for j in range(len(data)):
@@ -1028,6 +1055,65 @@ def edit_class():
         conn.rollback()
         return jsonify({"message":"An error occurred while delete class.","Status": False})   
 
+@app.route("/TA/class/geteditor", methods=["GET"])
+def get_class_editor():
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    CSYID = request.args.get('CSYID')  # Use request.args for GET requests
+    
+    query_creator = """ 
+        SELECT ClassCreator FROM grader3.class WHERE CSYID=%s;
+        """
+    cursor.execute(query_creator, (CSYID,))  # You need to pass a tuple as the second argument
+    creator_data = cursor.fetchone() 
+    
+    transformed_data = {'Creator': creator_data[0], 'Email': []}  # Corrected dictionary initialization
+    
+    query_editor = """ 
+        SELECT Email FROM classeditor WHERE CSYID = %s AND Email != %s
+        """
+    cursor.execute(query_editor, (CSYID,creator_data[0]))  # You need to pass a tuple as the second argument
+    editor_data = cursor.fetchall() 
+    
+    for email in editor_data:
+        transformed_data['Email'].append(email[0])  # Added missing '=' sign
+    
+    return jsonify(transformed_data)
+
+
+@app.route("/TA/class/editor", methods=["POST"])
+def edit_class_editor():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Assuming EditorList is a comma-separated string of email addresses
+    EditorList = request.form.get('emailList').split(',')
+    CSYID = request.form.get('CSYID')
+    print("editor:",EditorList)
+    
+    try:
+        # Clear editors except the creator
+        query_creator = """SELECT ClassCreator FROM grader3.class WHERE CSYID = %s"""
+        cursor.execute(query_creator, (CSYID,))
+        creator_data = cursor.fetchone()
+
+        clear_editor = """DELETE FROM classeditor WHERE Email != %s AND CSYID = %s"""
+        cursor.execute(clear_editor, (creator_data[0], CSYID))
+
+        # Add new editors
+        if EditorList!=[''] :
+            for email in EditorList:
+                AddClassEditor(conn,cursor,email,CSYID)
+
+        conn.commit()
+        return jsonify({"message": "Class updated successfully", "Status": True})
+    except mysql.connector.Error as error:
+        conn.rollback()
+        return jsonify({"message": "An error occurred while updating class.", "Status": False})
+
+
+    
 @app.route("/TA/class/Assign", methods=["GET"])
 def TAclass_assignment():
     try:
@@ -1098,13 +1184,34 @@ def TAclass_assignmentcreate():
         LabNum = request.form.get('labNum')
         LabName = request.form.get('labName')
         CSYID = request.form.get('CSYID')
-        Question = json.loads(request.form.get('Question'))
+
+        # Process questions object to extract file objects correctly
+        questions = {}
+        for key in request.files:
+            try:
+                # Split the key to extract the index
+                index = int(key.split('[')[1].split(']')[0])
+                # Extract the file object
+                file_obj = request.files[key]
+                # Add the file object to the questions dictionary with the index as the key
+                questions[index] = file_obj
+            except IndexError:
+                # Handle cases where the key does not contain the expected format
+                print(f"Ignore key: {key} - Index not found.")
+
+
         submittedDates = json.loads(request.form.get('submittedDates'))
         Create_time = datetime.now(gmt_timezone)
         Links = request.form.get('link')
+        # Retrieve AddFile as a list of file objects
+        AddFile = request.files.getlist('AddFile')
+
+        
+        print(questions)
+        print('Addfile:',AddFile)
         
         spLinks = re.split(r'\s*,\s*', Links)
-        print(spLinks)
+        
         
         #check if lab already exist
         select_lab_query = "SELECT Lab,Name,CSYID FROM lab WHERE Lab = %s AND CSYID = %s"
@@ -1118,14 +1225,82 @@ def TAclass_assignmentcreate():
             insert_lab_query = "INSERT INTO lab (Lab, Name, CSYID) VALUES (%s, %s, %s)"
             cursor.execute(insert_lab_query, (LabNum, LabName, CSYID))
 
+            #upload AddFile
+            if AddFile != ['']:
+                #create folder
+                for Afile in AddFile:
+                    filename = secure_filename(Afile.filename)
+                    addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum)+'/'+ filename)  # Corrected path
+                    if not os.path.exists(os.path.dirname(addfilepath)):
+                        try:
+                            os.makedirs(os.path.dirname(addfilepath))
+                        except OSError as exc:
+                            if exc.errno != errno.EEXIST:
+                                raise
+                    Afile.save(addfilepath)
+                    
+
+            
+
             #create Question
-            for question_data in Question:
+            addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum))
+            for index, Qfile in questions.items():
                 try:
-                    question_id = question_data['id']
-                    score = question_data['score']
+                    #create folder
+                    try:
+                        # Create folder
+                        keyfilepath = os.path.join(UPLOAD_FOLDER, 'Question', str(CSYID))  # Define keyfilepath
+                        if not os.path.exists(keyfilepath):
+                            os.makedirs(keyfilepath)
+
+                        # Save question file
+                        filename = secure_filename(Qfile.filename)
+                        Qfilepath = os.path.join(keyfilepath, filename)
+                        Qfile.save(Qfilepath)
+                    except OSError as exc:
+                        if exc.errno != errno.EEXIST:
+                            raise
+                    
+                    #get maxscore
+                    AS = []
+                    times = []
+                    Rscore = [0,0]
+                    i = time.perf_counter()
+                    n = 1
+                    
+                    readfile = glob.glob(addfilepath + "/*.txt")
+                    if(readfile):
+                        Check="True"
+                    else:
+                        Check="ok"
+                    print("read:",readfile)
+                    print("check:",Check)
+                    print("grader:",Qfilepath,Qfilepath,"readfile","validate",Check)
+                    err, data = grader.grade(Qfilepath, Qfilepath, addfile=readfile, validate=False, check_keyword=Check)
+                    if(err):
+                        print("ERROR:", data)
+                    else:
+                        AS.append(data)
+                    if len(data) == 1:
+                        Rscore[0]=Rscore[0]+data[0][0]
+                        Rscore[1]=Rscore[1]+data[0][1]
+                        print(f"Points: {data[0][0]}\nMax Points: {data[0][1]}")
+                    else:
+                        for j in range(len(data)):
+                            Rscore[0]=Rscore[0]+data[j][0]
+                            Rscore[1]=Rscore[1]+data[j][1]
+                    times.append(time.perf_counter() - i)
+                    n += 1
+                    
+                    print(index,'>score:',Rscore)
+                    score = Rscore[1]
+
                     # Insert question data into the database
-                    insert_question_query = "INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s)"
-                    cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
+                    insert_question_query = "INSERT INTO question (Creator, Lab, Question, PathToQuestion, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+                    cursor.execute(insert_question_query, (Creator, LabNum, index, Qfilepath, score, Create_time, CSYID))
+                    
+                    
+                    
                 except mysql.connector.Error as error:
                     conn.rollback()
                     return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
@@ -1139,10 +1314,13 @@ def TAclass_assignmentcreate():
                 cursor.execute(insert_assignTo,(LabNum,Publish,Due,CID,CSYID))
                 
             #Links add
+            
+            
             for alink in spLinks:
                 print(alink)
-                insert_addfile = """ INSERT INTO addfile (Lab,PathToFile,CSYID) VALUES(%s,%s,%s) """
-                cursor.execute(insert_addfile,(LabNum,alink,CSYID))
+                # Create the path for AddFile
+                insert_addfile = """ INSERT INTO addfile (Lab,PathToFile,PathToAddFile,CSYID) VALUES(%s,%s,%s,%s) """
+                cursor.execute(insert_addfile,(LabNum,alink,addfilepath,CSYID))
 
             conn.commit()
             return jsonify({"message":"create success","Status":True}), 500
@@ -1150,6 +1328,7 @@ def TAclass_assignmentcreate():
     except mysql.connector.Error as error:
         conn.rollback()
         return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+
 
 @app.route("/TA/class/Assign/delete", methods=["POST"])
 def TAclass_assignmentdelete():
@@ -1187,10 +1366,23 @@ def TAclass_assignmentedit():
         
         LabNum = request.form.get('labNum')
         LabName = request.form.get('labName')
-        Question = json.loads(request.form.get('Question'))
         submittedDates = json.loads(request.form.get('submittedDates'))
         Links = request.form.get('link')
+        AddFile = request.files.getlist('AddFile')
         
+        questions = {}
+        for key in request.files:
+            try:
+                # Split the key to extract the index
+                index = int(key.split('[')[1].split(']')[0])
+                # Extract the file object
+                file_obj = request.files[key]
+                # Add the file object to the questions dictionary with the index as the key
+                questions[index] = file_obj
+            except IndexError:
+                # Handle cases where the key does not contain the expected format
+                print(f"Ignore key: {key} - Index not found.")
+                
         spLinks = re.split(r'\s*,\s*', Links)
 
         #check lab exist
@@ -1205,9 +1397,7 @@ def TAclass_assignmentedit():
 
         #update Question
         try:
-            for question_data in Question:
-                question_id = question_data['id']
-                score = question_data['score']
+            for question_id,score in questions.items():
                 # Insert question data into the database
                 insert_question_query = """ 
                     INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID)
@@ -1255,16 +1445,36 @@ def TAclass_assignmentedit():
             return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
         
         try:
-            #delete addfile
+            #delete link
             delete_addfile = """ 
                     DELETE FROM addfile WHERE Lab = %s AND CSYID = %s
                 """
             cursor.execute(delete_addfile,(LabNum,CSYID))
             
-            #addfile adding
+            #link adding
             for alink in spLinks:
                 insert_addfile = """ INSERT INTO addfile (Lab,PathToFile,CSYID) VALUES(%s,%s,%s) """
                 cursor.execute(insert_addfile,(LabNum,alink,CSYID))
+            
+            #delete addfile
+            addfile_query = "SELECT PathToAddFile FROM addfile WHERE LAB = %s AND CSYID = %s"
+            cursor.execute(addfile_query, (oldLabNum, CSYID))
+            filepath_addfile = cursor.fetchone()[0]
+            delete_txt_files(filepath_addfile)
+            
+            #putback addfile
+            if AddFile != ['']:
+                #create folder
+                for Afile in AddFile:
+                    filename = secure_filename(Afile.filename)
+                    addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum)+'/'+ filename)  # Corrected path
+                    if not os.path.exists(os.path.dirname(addfilepath)):
+                        try:
+                            os.makedirs(os.path.dirname(addfilepath))
+                        except OSError as exc:
+                            if exc.errno != errno.EEXIST:
+                                raise
+                    Afile.save(addfilepath)
                 
         except mysql.connector.Error as error:
             conn.rollback()
@@ -1284,7 +1494,7 @@ def TAclass_score():
         cursor = g.db.cursor()
         
         CSYID = request.args.get('CSYID')
-        Lab = request.args.get('Lab')
+        Lab = int(request.args.get('Lab'))
                 
         query = """ 
             SELECT 
@@ -1326,7 +1536,7 @@ def TAclass_score():
                 transformed_data[lab]['Questions'][question] = {'MaxScore': max_score, 'Scores': {}}
             transformed_data[lab]['Questions'][question]['Scores'][uid] = {'Name':name,'Score': score, 'Timestamp': timestamp,'Late':bool(late),'Section':section,'LastEdit':last_edit}
 
-
+        print('data:',transformed_data)
         return jsonify(transformed_data[Lab])
         
     except mysql.connector.Error as error:

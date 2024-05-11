@@ -183,7 +183,7 @@ function Lab() {
                           <p className="card-text col-sm-9">Last submission: {submissionResponses[questionKey].FileName||question.Submission.FileName}</p>
                           <div className="col-sm-10" style={{ display: 'inline' }}>
                             <div className="row">
-                              <p className="card-text col-sm-9">At: {submissionResponses[questionKey].At ? new Date(submissionResponses[questionKey].At).toLocaleString():question.Submission.Date ? new Date(question.Submission.Date).toLocaleString():""}</p>
+                              <p className="card-text col-sm-9">At: {submissionResponses[questionKey].At ? new Date(submissionResponses[questionKey].At).toLocaleString():question.Submission.Date ? new Date(question.Submission.Date).toLocaleString('en-US', {timeZone: 'UTC'}) :""}</p>
                               <p className="card-text col-sm-3">Score: {submissionResponses[questionKey].Score||question.Score || '-'}/{question.MaxScore}</p>
                             </div>
                           </div>

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import json
 import traceback
@@ -127,7 +128,8 @@ def grade(Question, submit, addfile=[], validate=True, timeout=20, check_keyword
             test = "".join(ScodeCell[j])
             if(len(addfile) != 0):
                 for k in addfile:
-                    x = k.split("/")
+                    fk = k.replace("\\", "/")
+                    x = fk.split("/")
                     test = test.replace(x[-1], k)
             try:
                 if(n == 0):
@@ -150,7 +152,7 @@ def grade(Question, submit, addfile=[], validate=True, timeout=20, check_keyword
                 if(p): temp_cor_p += pointsL[num]
             except Exception:
                 pass
-                # print(traceback.format_exc())
+                """ print(traceback.format_exc()) """
             num += 1
         score.append([temp_cor_p, temp_max_p])
     return False, score
