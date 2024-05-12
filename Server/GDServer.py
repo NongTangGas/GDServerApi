@@ -226,11 +226,11 @@ def get_assigndata():
 
         transformdata['LabTime'][section] = {'publishDate': formatted_publish, 'dueDate': formatted_due}
     
-    # Query for question and max score
+    # Query for question and filename
     question_questionsscore_query = """
     SELECT
         QST.Question,
-        QST.MaxScore
+        QST.PathToQuestion
     FROM
         question QST
     WHERE 
@@ -240,9 +240,10 @@ def get_assigndata():
     cursor.execute(question_questionsscore_query, (CSYID, LabNumber))
     question_data = cursor.fetchall()
     
-    transformdata['Question'] = [{"id": q[0], "score": q[1]} for q in question_data]
+    transformdata['Question'] = {int(q[0]): q[1].split("\\")[-1] for q in question_data}
+
     
-    # Query for additional files
+    # Query for links
     question_addfile_query = """
     SELECT
         ADF.PathToFile
@@ -256,6 +257,21 @@ def get_assigndata():
     file_data = cursor.fetchall()
     
     transformdata['file'] = [f[0] for f in file_data]
+    
+    # Query for additional files
+    question_addfile_query = """
+    SELECT
+        ADF.PathToAddFile
+    FROM
+        addfile ADF
+    WHERE
+        ADF.CSYID = %s
+        AND ADF.Lab = %s
+    """
+    cursor.execute(question_addfile_query, (CSYID, LabNumber))
+    file_data = cursor.fetchall()
+    
+    transformdata['addfile'] = [f[0] for f in file_data]
     
     # Query for Section
     question_section_query = """
@@ -1362,7 +1378,7 @@ def TAclass_assignmentedit():
         Create_time = datetime.now(gmt_timezone) #no change
         
         oldLabNum = request.form.get('oldlabNum')
-        
+        MQuestion = request.form.get('MaxQ')
         
         LabNum = request.form.get('labNum')
         LabName = request.form.get('labName')
@@ -1394,32 +1410,102 @@ def TAclass_assignmentedit():
         #update lab
         update_lab_query = """ UPDATE lab SET Lab = %s,Name = %s WHERE Lab = %s AND CSYID = %s """
         cursor.execute(update_lab_query, (LabNum, LabName, oldLabNum, CSYID))
+        
+        #upload AddFile
+        if AddFile != ['']:
+            #create folder
+            for Afile in AddFile:
+                filename = secure_filename(Afile.filename)
+                addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum)+'/'+ filename)  # Corrected path
+                if not os.path.exists(os.path.dirname(addfilepath)):
+                    try:
+                        os.makedirs(os.path.dirname(addfilepath))
+                    except OSError as exc:
+                        if exc.errno != errno.EEXIST:
+                            raise
+                Afile.save(addfilepath)
 
-        #update Question
+        #delete before update Question
         try:
             for question_id,score in questions.items():
-                # Insert question data into the database
-                insert_question_query = """ 
-                    INSERT INTO question (Creator, Lab, Question, MaxScore, LastEdit, CSYID)
-                    VALUES (%s, %s, %s, %s, %s, %s) AS new
-                    ON DUPLICATE KEY UPDATE MaxScore = new.MaxScore,LastEdit = new.LastEdit
+                
+                delete_question_query = """ 
+                    DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question > %s
                 """
-                cursor.execute(insert_question_query, (Creator, LabNum, question_id, score, Create_time, CSYID))
-                maxQuestion = question_id
+                cursor.execute(delete_question_query, (LabNum, CSYID, MQuestion))
+                
+                delete_question_query = """ 
+                    DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question = %s
+                """
+                cursor.execute(delete_question_query, (LabNum, CSYID, question_id))
+                
+            #create Question
+            addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum))
+            for index, Qfile in questions.items():
+                try:
+                    #create folder
+                    try:
+                        # Create folder
+                        keyfilepath = os.path.join(UPLOAD_FOLDER, 'Question', str(CSYID))  # Define keyfilepath
+                        if not os.path.exists(keyfilepath):
+                            os.makedirs(keyfilepath)
+        
+                        # Save question file
+                        filename = secure_filename(Qfile.filename)
+                        Qfilepath = os.path.join(keyfilepath, filename)
+                        Qfile.save(Qfilepath)
+                    except OSError as exc:
+                        if exc.errno != errno.EEXIST:
+                            raise
+                    
+                    #get maxscore
+                    AS = []
+                    times = []
+                    Rscore = [0,0]
+                    i = time.perf_counter()
+                    n = 1
+                    
+                    readfile = glob.glob(addfilepath + "/*.txt")
+                    if(readfile):
+                        Check="True"
+                    else:
+                        Check="ok"
+                    print("read:",readfile)
+                    print("check:",Check)
+                    print("grader:",Qfilepath,Qfilepath,"readfile","validate",Check)
+                    err, data = grader.grade(Qfilepath, Qfilepath, addfile=readfile, validate=False, check_keyword=Check)
+                    if(err):
+                        print("ERROR:", data)
+                    else:
+                        AS.append(data)
+                    if len(data) == 1:
+                        Rscore[0]=Rscore[0]+data[0][0]
+                        Rscore[1]=Rscore[1]+data[0][1]
+                        print(f"Points: {data[0][0]}\nMax Points: {data[0][1]}")
+                    else:
+                        for j in range(len(data)):
+                            Rscore[0]=Rscore[0]+data[j][0]
+                            Rscore[1]=Rscore[1]+data[j][1]
+                    times.append(time.perf_counter() - i)
+                    n += 1
+                    
+                    print(index,'>score:',Rscore)
+                    score = Rscore[1]
+
+                    # Insert question data into the database
+                    insert_question_query = "INSERT INTO question (Creator, Lab, Question, PathToQuestion, MaxScore, LastEdit, CSYID) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+                    cursor.execute(insert_question_query, (Creator, LabNum, index, Qfilepath, score, Create_time, CSYID))
+                    
+                    
+                    
+                except mysql.connector.Error as error:
+                    conn.rollback()
+                    return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
         
         except mysql.connector.Error as error:
             conn.rollback()
             return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
-        #delete unuse Question
-        try:
-            delete_question_query = """ 
-                    DELETE QST FROM question QST WHERE QST.Lab = %s AND QST.CSYID = %s AND QST.Question > %s
-                """
-            cursor.execute(delete_question_query, (LabNum, CSYID, maxQuestion))
-                
-        except mysql.connector.Error as error:
-                conn.rollback()
-                return jsonify({"error": f"An error occurred: {error}","Status":False}), 500
+        
         #delete old assign
         try:
             delete_assign_query = """ 
@@ -1453,28 +1539,10 @@ def TAclass_assignmentedit():
             
             #link adding
             for alink in spLinks:
-                insert_addfile = """ INSERT INTO addfile (Lab,PathToFile,CSYID) VALUES(%s,%s,%s) """
-                cursor.execute(insert_addfile,(LabNum,alink,CSYID))
-            
-            #delete addfile
-            addfile_query = "SELECT PathToAddFile FROM addfile WHERE LAB = %s AND CSYID = %s"
-            cursor.execute(addfile_query, (oldLabNum, CSYID))
-            filepath_addfile = cursor.fetchone()[0]
-            delete_txt_files(filepath_addfile)
-            
-            #putback addfile
-            if AddFile != ['']:
-                #create folder
-                for Afile in AddFile:
-                    filename = secure_filename(Afile.filename)
-                    addfilepath = os.path.join(UPLOAD_FOLDER+'/'+'AddFile'+'/'+str(CSYID)+'/'+str(LabNum)+'/'+ filename)  # Corrected path
-                    if not os.path.exists(os.path.dirname(addfilepath)):
-                        try:
-                            os.makedirs(os.path.dirname(addfilepath))
-                        except OSError as exc:
-                            if exc.errno != errno.EEXIST:
-                                raise
-                    Afile.save(addfilepath)
+                print(alink)
+                # Create the path for AddFile
+                insert_addfile = """ INSERT INTO addfile (Lab,PathToFile,PathToAddFile,CSYID) VALUES(%s,%s,%s,%s) """
+                cursor.execute(insert_addfile,(LabNum,alink,addfilepath,CSYID))
                 
         except mysql.connector.Error as error:
             conn.rollback()

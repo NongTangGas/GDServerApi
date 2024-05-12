@@ -37,6 +37,7 @@ function AssignEdit() {
   const [totalAdditionalFiles, setTotalAdditionalFiles] = useState(0);
   const [questions, setQuestions] = useState({}); //file เฉลยแต่ละข้อ
   const [additionalFiles, setAdditionalFiles] = useState([]); //file เพิ่มเติมรวมๆ
+  const [addfile, setAddFile] = useState(0);
 
   const handleTotalQNumChange = (e) => {
     const numQuestions = parseInt(e.target.value, 10);
@@ -69,11 +70,12 @@ function AssignEdit() {
       const response = await fetch(`http://127.0.0.1:5000/TA/class/Assign/data?CSYID=${classId}&labnumber=${oldlab}`);
       const data = await response.json();
       console.log('sections:', data);
-      setTotalQNum(data.Question.length);
+      setTotalQNum(Object.keys(data.Question).length);
       setScores(data.Question)
       setCheckedSections(data.section)
       setSubmittedDates(data.LabTime)
       setLinks(data.file.join(','))
+      setAddFile(data.addfile)
       console.log(submittedDates)
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -233,6 +235,7 @@ function AssignEdit() {
     formData.append('labNum', labNum);
     formData.append('labName', labName);
     formData.append('CSYID', classId);
+    formData.append('MaxQ',totalQNum)
     for (const index in questions) {
       const file = questions[index];
       formData.append(`Question[${index}]`, file);
@@ -262,6 +265,7 @@ function AssignEdit() {
     } else {
       console.log('Please fill in all fields correctly.');
     }
+    fetchLab()
   };
   
 
@@ -346,12 +350,27 @@ const handleFileDelete = (index) => {
               </div>
               <div className="col-md-9">
                 {Array.from({ length: totalQNum }, (_, index) => (
-                  <div key={index} className="input-group mt-3">
-                    <span className="input-group-text">Question {index + 1}</span>
-                    <input type="file" className="form-control" id={`inputGroupFile${index + 1}`} aria-describedby={`inputGroupFileAddon${index + 1}`} aria-label="Upload" onChange={(e) => handleQuestionFileChange(e, index)}/>
+                  <div key={index} className="row mt-3">
+                    <div className="col-md-12">
+                      <div className="input-group">
+                        <span className="input-group-text">Question {index + 1}</span>
+                        <input
+                          type="file"
+                          className="form-control"
+                          id={`inputGroupFile${index + 1}`}
+                          aria-describedby={`inputGroupFileAddon${index + 1}`}
+                          aria-label="Upload"
+                          onChange={(e) => handleQuestionFileChange(e, index)}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-12 mt-2">
+                      Last upload: {Question[index + 1]}
+                    </div>
                   </div>
                 ))}
               </div>
+
             </div>
 
 
